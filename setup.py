@@ -24,6 +24,7 @@ docs_extras = [
 ]
 
 tests_require = [
+    "evilunit"
 ]
 
 testing_extras = tests_require + [

@@ -99,12 +99,13 @@ class FormMeta(type):
 
 
 class FormBase(object):
-    def __init__(self, data=None, initial=None, options={"strict": False}):
+    def __init__(self, data=None, initial=None, prefix="", options={"strict": False}):
         self.options = options
         self.rawdata = data or {}
         self.data = self.rawdata.copy()
         self.initial = initial or {}
         self.errors = None
+        self.prefix = prefix
 
     @reify
     def schema(self):
@@ -116,10 +117,13 @@ class FormBase(object):
 
     def cleansing(self, data=None):
         data = data or self.data
+        d = {}
         for k, f in self.schema.fields.items():
-            if data.get(k) == "" and not isinstance(f, fields.String):
-                data.pop(k)
-        return data
+            v = data.get(self.prefix + k, "")
+            if v == "" and not isinstance(f, fields.String):
+                continue
+            d[k] = v
+        return d
 
     def has_errors(self):
         return bool(self.errors)
