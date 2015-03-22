@@ -140,6 +140,35 @@ class NestedTests(unittest.TestCase):
 
 
 @test_target("marshmallow_form:Form")
+class NestedTests2(unittest.TestCase):
+    def _makeOne(self, *args, **kwargs):
+        import marshmallow_form as mf
+        Class = self._getTarget()
+
+        class X(Class):
+            name = mf.String()
+
+        class Y(Class):
+            x0 = mf.Nested(X)
+            x1 = mf.Nested(X)
+
+        class Z(Class):
+            y0 = mf.Nested(Y)
+            y1 = mf.Nested(Y)
+        return Z(*args, **kwargs)
+
+    def test_it(self):
+        form = self._makeOne()
+        input_data = {f.name: f.value for f in form}
+        result = form.deserialize(input_data)
+        expected = {'y0': {'x1': {'name': ''},
+                           'x0': {'name': ''}},
+                    'y1': {'x1': {'name': ''},
+                           'x0': {'name': ''}}}
+        self.assertEqual(result, expected)
+
+
+@test_target("marshmallow_form:Form")
 class ValidationTests(unittest.TestCase):
     def _makeOne(self):
         import marshmallow_form as mf
