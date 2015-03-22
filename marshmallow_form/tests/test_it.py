@@ -30,7 +30,7 @@ class RenderingTests(unittest.TestCase):
         result = list(f.name for f in form)
         self.assertEqual(result, ["name", "age"])
 
-    def test_edit_metadata__no_effect_at_other_instance(self):
+    def test_modify_metadata__no_effect_at_other_instance(self):
         form = self._makeOne()
         form.name.metadata["class"] = "js-name"
         self.assertIn("class", form.name.metadata)

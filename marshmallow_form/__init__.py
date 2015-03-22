@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import logging
+import copy
 from functools import partial
 from marshmallow import fields
 from marshmallow.compat import text_type
@@ -118,8 +119,11 @@ class NestedBoundField(BoundField):
     def __init__(self, name, field, form):
         self._name = name
         self.field = field
-        self.children = field.nested._declared_fields
         self.form = form
+
+    @reify
+    def children(self):
+        return copy.deepcopy(self.field.nested._declared_fields)
 
     def __iter__(self):
         for k in self.children.keys():
