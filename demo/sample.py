@@ -7,23 +7,20 @@ class PersonForm(mf.Form):
 
 
 class ParentsForm(mf.Form):
-    father = mf.Nested(PersonForm.schema_factory)
-    mother = mf.Nested(PersonForm.schema_factory)
+    father = mf.Nested(PersonForm, label="父親")
+    mother = mf.Nested(PersonForm, label="母親")
 
-# print(PersonForm.schema_factory)
-# print(PersonForm(options={"many": True}).schema)
+# TODO: more gentle sample.
 form = PersonForm(initial={"name": "Foo"})
 print(form.name["placeholder"])
 print(form.name.value)
 for f in form:
-    print(f)
+    print(f.name, f.value)
 
 form = PersonForm({"name": "foo", "age": "a"})
 print(form.deserialize())
 print(form.errors)
 
-# # TODO:nested
-# form = ParentsForm()
-# for f in form:
-#     for sf in f:
-#         print(sf)
+form = ParentsForm()
+for f in form:
+    print(f.name, f.value)
