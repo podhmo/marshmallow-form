@@ -138,6 +138,23 @@ class NestedTests(unittest.TestCase):
         }
         self.assertEqual(result, expected)
 
+    def test_initial(self):
+        initial_data = {
+            "mother": {"name": "foo", "age": 10},
+            "father": {"name": "foo", "age": 10},
+            "yagou": "bar"
+        }
+        form = self._makeOne(initial=initial_data)
+        result = {f.name: f.value for f in form}
+        expected = {
+            'yagou': 'bar',
+            'mother.age': 10,
+            'father.name': 'foo',
+            'mother.name': 'foo',
+            'father.age': 10
+        }
+        self.assertEqual(result, expected)
+
 
 @test_target("marshmallow_form:Form")
 class NestedTests2(unittest.TestCase):

@@ -54,16 +54,17 @@ class Field(object):
         return bf
 
 
-def bound_field(name, field, ob):
+def bound_field(name, field, ob, key=None):
     if hasattr(field, "nested"):
         return NestedBoundField(name, field, ob)
     else:
-        return BoundField(name, field, ob)
+        return BoundField(name, field, ob, key=key)
 
 
 class BoundField(object):
-    def __init__(self, name, field, form):
+    def __init__(self, name, field, form, key=None):
         self.name = name
+        self.key = key or name
         self.field = field
         self.form = form
 
@@ -95,9 +96,22 @@ class BoundField(object):
 
     @reify
     def value(self):
-        return (self.form.data.get(self.name)
-                or self.form.initial.get(self.name)
+        return (self.form.data.get(self.key)
+                or self.form.initial.get(self.key)
                 or self.field.default)
+
+
+class SubForm(object):
+    def __init__(self, data, initial, itemgetter):
+        self.data = data
+        self.initial = initial
+        self.itemgetter = itemgetter
+
+    @classmethod
+    def from_form(cls, name, form):
+        data = (form.data.get(name) if form.data else None) or {}
+        initial = (form.initial.get(name) if form.initial else None) or {}
+        return cls(data, initial, itemgetter=form.itemgetter)
 
 
 class NestedBoundField(BoundField):
@@ -121,7 +135,8 @@ class NestedBoundField(BoundField):
     def __getattr__(self, k):
         if k not in self.children:
             raise AttributeError(k)
-        bf = bound_field("{}.{}".format(self._name, k), self.children[k], self.form)
+        subform = SubForm.from_form(self._name, self.form)
+        bf = bound_field("{}.{}".format(self._name, k), self.children[k], subform, key=k)
         setattr(self, k, bf)
         return bf
 
