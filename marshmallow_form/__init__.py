@@ -148,7 +148,7 @@ class FormMeta(type):
         return super().__new__(self, name, bases, attrs)
 
 
-class FormBase(object):
+class FlattenFormBase(object):
     itemgetter = staticmethod(lambda d, k: d.get(k, ""))
 
     def __init__(self, data=None, initial=None, prefix="", options={"strict": False}):
@@ -223,7 +223,7 @@ class FormBase(object):
         return self.schema.dump(data)
 
 
-Form = FormMeta("Form", (FormBase, ), {})
+Form = FlattenForm = FormMeta("FlattenForm", (FlattenFormBase, ), {})
 
 
 # TODO:
