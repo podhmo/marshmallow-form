@@ -76,12 +76,18 @@ class RenderingTests(unittest.TestCase):
 @test_target("marshmallow_form:Form")
 class NestedTests(unittest.TestCase):
     def _makeOne(self, *args, **kwargs):
+        from collections import namedtuple
         import marshmallow_form as mf
         Class = self._getTarget()
+
+        self.Person = Person = namedtuple("Person", "name age")
 
         class PersonForm(Class):
             name = mf.String()
             age = mf.Int()
+
+            def make_object(self, kwargs):
+                return Person(**kwargs)
 
         class ParentsForm(Class):
             yagou = mf.String()
@@ -120,8 +126,8 @@ class NestedTests(unittest.TestCase):
                       "mother": user_data}
         result = form.deserialize(input_data, cleansing=False)
         expected = {
-            "mother": {"name": "foo", "age": 10},
-            "father": {"name": "foo", "age": 10},
+            "mother": self.Person("foo", 10),
+            "father": self.Person("foo", 10),
             "yagou": "bar"
         }
         self.assertEqual(result, expected)

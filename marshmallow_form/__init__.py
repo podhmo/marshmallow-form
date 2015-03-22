@@ -158,6 +158,10 @@ class FormMeta(type):
                 v.name = k
                 schema_attrs[k] = v.expose()
                 fields.append(v)
+
+        if "make_object" in attrs:
+            schema_attrs["make_object"] = attrs.pop("make_object")
+
         attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
         schema_class = self.SchemaBase.__class__(name.replace("Form", "Schema"), (self.SchemaBase, ), schema_attrs)
         attrs["schema_factory"] = schema_class
