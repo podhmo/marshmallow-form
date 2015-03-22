@@ -123,7 +123,8 @@ class NestedBoundField(BoundField):
 
     def __iter__(self):
         for k in self.children.keys():
-            yield getattr(self, k)
+            for f in getattr(self, k):
+                yield f
 
     @property
     def metadata(self):

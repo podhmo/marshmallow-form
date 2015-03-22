@@ -154,6 +154,7 @@ class NestedTests(unittest.TestCase):
             'father.age': 10
         }
         self.assertEqual(result, expected)
+        self.assertEqual(form.father.name.value, "foo")
 
 
 @test_target("marshmallow_form:Form")
