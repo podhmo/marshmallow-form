@@ -30,6 +30,34 @@ class RenderingTests(unittest.TestCase):
         result = list(f.name for f in form)
         self.assertEqual(result, ["name", "age"])
 
+    def test_add_field(self):
+        import marshmallow_form as mf
+        form = self._makeOne()()
+        form.add_field("birth", mf.DateField(required=True, doc="生まれ"))
+        self.assertEqual(form.birth["doc"], "生まれ")
+
+    def test_add_field__no_effect_at_other_instance(self):
+        import marshmallow_form as mf
+        form = self._makeOne()()
+        form.add_field("birth", mf.DateField(required=True, doc="生まれ"))
+        other = self._makeOne()()
+        with self.assertRaises(AttributeError):
+            other.birth
+
+    def test_remove_field(self):
+        form = self._makeOne()()
+        form.remove_field("age")
+        result = list(f.name for f in form)
+        self.assertEqual(result, ["name"])
+
+    def test_remove_field__no_effect_at_other_instance(self):
+        form = self._makeOne()()
+        form.remove_field("age")
+
+        other = self._makeOne()()
+        result = list(f.name for f in other)
+        self.assertEqual(result, ["name", "age"])
+
 
 @test_target("marshmallow_form:Form")
 class ValidationTests(unittest.TestCase):

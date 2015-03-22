@@ -111,6 +111,20 @@ class FormBase(object):
     def schema(self):
         return self.schema_factory(**self.options)
 
+    def add_field(self, name, field):
+        if hasattr(field, "expose"):
+            field = field.expose()
+        self.schema.fields[name] = field
+        setattr(self, name, BoundField(name, field, self))
+
+    def remove_field(self, name):
+        if hasattr(self, name):
+            delattr(self, name)
+            del self.schema.fields[name]
+        if "ordered_names" not in self.__dict__:
+            self.ordered_names = self.ordered_names[:]
+        self.ordered_names.remove(name)
+
     def __iter__(self):
         for name in self.ordered_names:
             yield getattr(self, name)
