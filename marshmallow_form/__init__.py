@@ -48,19 +48,27 @@ class Field(object):
         if ob is None:
             return self
         name = self.name
-        bf = self.bound_field(name, ob)
+        field = ob.schema.fields[name]
+        bf = bound_field(name, field, ob)
         ob.__dict__[name] = bf
         return bf
 
-    def bound_field(self, name, ob):
-        return Bound(name, ob.schema.fields[name], ob)
+
+def bound_field(name, field, ob):
+    if hasattr(field, "nested"):
+        return NestedBoundField(name, field, ob)
+    else:
+        return BoundField(name, field, ob)
 
 
-class Bound(object):
+class BoundField(object):
     def __init__(self, name, field, form):
         self.name = name
         self.field = field
         self.form = form
+
+    def __iter__(self):
+        yield self
 
     @property
     def metadata(self):
@@ -90,6 +98,32 @@ class Bound(object):
         return (self.form.data.get(self.name)
                 or self.form.initial.get(self.name)
                 or self.field.default)
+
+
+class NestedBoundField(BoundField):
+    def __init__(self, name, field, form):
+        self._name = name
+        self.field = field
+        self.children = field.nested._declared_fields
+        self.form = form
+
+    def __iter__(self):
+        for k in self.children.keys():
+            yield getattr(self, k)
+
+    @property
+    def metadata(self):
+        return self.field.metadata
+
+    def __getitem__(self, k):
+        return self.form.itemgetter(self.metadata, k)
+
+    def __getattr__(self, k):
+        if k not in self.children:
+            raise AttributeError(k)
+        bf = bound_field("{}.{}".format(self._name, k), self.children[k], self.form)
+        setattr(self, k, bf)
+        return bf
 
 
 def field(fieldclass, *args, **kwargs):
@@ -133,7 +167,7 @@ class FormBase(object):
         if hasattr(field, "expose"):
             field = field.expose()
         self.schema.fields[name] = field
-        setattr(self, name, Bound(name, field, self))
+        setattr(self, name, BoundField(name, field, self))
 
     def remove_field(self, name):
         if hasattr(self, name):
@@ -145,24 +179,41 @@ class FormBase(object):
 
     def __iter__(self):
         for name in self.ordered_names:
-            yield getattr(self, name)
+            for bfield in getattr(self, name):
+                yield bfield
+
+    def _parsing_iterator(self, name, field):
+        if hasattr(field, "nested"):
+            for subname, f in field.nested._declared_fields.items():
+                for subname, subf in self._parsing_iterator(subname, f):
+                    yield "{}.{}".format(name, subname), subf
+        else:
+            yield name, field
 
     def cleansing(self, data=None):
         data = data or self.data
-        d = {}
-        for k, f in self.schema.fields.items():
-            v = data.get(self.prefix + k, "")
-            if v == "" and not isinstance(f, fields.String):
-                continue
-            d[k] = v
-        return d
+        result = d = {}
+        for name, f in self.schema.fields.items():
+            for k, f in self._parsing_iterator(name, f):
+                d = result
+                v = data.get(self.prefix + k, "")
+                if v == "" and not isinstance(f, fields.String):
+                    continue
+                ts = k.split(".")
+                for t in ts[:-1]:
+                    if t not in d:
+                        d[t] = {}
+                    d = d[t]
+                d[ts[-1]] = v
+        return result
 
     def has_errors(self):
         return bool(self.errors)
 
-    def deserialize(self, data=None):
+    def deserialize(self, data=None, cleansing=True):
         data = data or self.data
-        data = self.cleansing(data)
+        if cleansing:
+            data = self.cleansing(data)
         result = self.schema.load(data)
         self.errors = result.errors
         return result.data
@@ -188,8 +239,13 @@ def select_wrap(pairs, *args, **kwargs):
     return fields.Select(choices, *args, **kwargs)
 
 
+def nested_wrap(formclass, *args, **kwargs):
+    schema = formclass.schema_factory
+    return fields.Nested(schema, *args, **kwargs)
+
+
 if __name__ != "__main__":
-    Nested = partial(field, fields.Nested)
+    Nested = partial(field, nested_wrap, required=True)
 
     Price = partial(field, fields.Price, required=True)
     Arbitrary = partial(field, fields.Arbitrary, required=True)
