@@ -53,10 +53,10 @@ class Field(object):
         return bf
 
     def bound_field(self, name, ob):
-        return BoundField(name, ob.schema.fields[name], ob)
+        return Bound(name, ob.schema.fields[name], ob)
 
 
-class BoundField(object):
+class Bound(object):
     def __init__(self, name, field, form):
         self.name = name
         self.field = field
@@ -67,7 +67,7 @@ class BoundField(object):
         return self.field.metadata
 
     def __getitem__(self, k):
-        return self.field.metadata[k]
+        return self.form.itemgetter(self.metadata, k)
 
     def __getattr__(self, k):
         return getattr(self.field, k)
@@ -77,13 +77,19 @@ class BoundField(object):
 
     @reify
     def choices(self):
-        labelgetter = self.metadata.get("labelgetter") or text_type
-        return LazyList(self.field.labels(labelgetter))
+        if "pairs" in self.metadata:
+            return self.metadata["pairs"]
+        elif hasattr(self.field, "labels"):
+            labelgetter = self.metadata.get("labelgetter") or text_type
+            return LazyList(self.field.labels(labelgetter))
+        else:
+            return []
 
     @reify
     def value(self):
         return (self.form.data.get(self.name)
-                or self.form.initial.get(self.name))
+                or self.form.initial.get(self.name)
+                or self.field.default)
 
 
 def field(fieldclass, *args, **kwargs):
@@ -109,6 +115,8 @@ class FormMeta(type):
 
 
 class FormBase(object):
+    itemgetter = staticmethod(lambda d, k: d.get(k, ""))
+
     def __init__(self, data=None, initial=None, prefix="", options={"strict": False}):
         self.options = options
         self.rawdata = data or {}
@@ -125,7 +133,7 @@ class FormBase(object):
         if hasattr(field, "expose"):
             field = field.expose()
         self.schema.fields[name] = field
-        setattr(self, name, BoundField(name, field, self))
+        setattr(self, name, Bound(name, field, self))
 
     def remove_field(self, name):
         if hasattr(self, name):
@@ -174,44 +182,49 @@ class ModelForm(Form):
         super(ModelForm, self).__init__(*args, **kwargs)
 
 
-NestedField = partial(field, fields.Nested)
+def select_wrap(pairs, *args, **kwargs):
+    choices = [p[0] for p in pairs]
+    kwargs["pairs"] = pairs
+    return fields.Select(choices, *args, **kwargs)
 
-PriceField = partial(field, fields.Price, required=True)
-ArbitraryField = partial(field, fields.Arbitrary, required=True)
-DecimalField = partial(field, fields.Decimal, required=True)
-DateTimeField = partial(field, fields.DateTime, required=True)
-URLField = partial(field, fields.URL, required=True)
-TimeField = partial(field, fields.Time, required=True)
-StrField = partial(field, fields.Str, required=True)
-BoolField = partial(field, fields.Bool, required=True)
-StringField = partial(field, fields.String, required=True)
-UrlField = partial(field, fields.Url, required=True)
-LocalDateTimeField = partial(field, fields.LocalDateTime, required=True)
-FloatField = partial(field, fields.Float, required=True)
-EmailField = partial(field, fields.Email, required=True)
-DateField = partial(field, fields.Date, required=True)
-FieldField = partial(field, fields.Field, required=True)
-IntField = partial(field, fields.Int, required=True)
-EnumField = partial(field, fields.Enum, required=True)
-TimeDeltaField = partial(field, fields.TimeDelta, required=True)
-UUIDField = partial(field, fields.UUID, required=True)
-FunctionField = partial(field, fields.Function, required=True)
-FormattedStringField = partial(field, fields.FormattedString, required=True)
-NumberField = partial(field, fields.Number, required=True)
-MethodField = partial(field, fields.Method, required=True)
-RawField = partial(field, fields.Raw, required=True)
-SelectField = partial(field, fields.Select, required=True)
-FixedField = partial(field, fields.Fixed, required=True)
-QuerySelectField = partial(field, fields.QuerySelect, required=True)
-ValidatedFieldField = partial(field, fields.ValidatedField, required=True)
-IntegerField = partial(field, fields.Integer, required=True)
-QuerySelectListField = partial(field, fields.QuerySelectList, required=True)
-BooleanField = partial(field, fields.Boolean, required=True)
-ListField = partial(field, fields.List, required=True)
+
+if __name__ != "__main__":
+    Nested = partial(field, fields.Nested)
+
+    Price = partial(field, fields.Price, required=True)
+    Arbitrary = partial(field, fields.Arbitrary, required=True)
+    Decimal = partial(field, fields.Decimal, required=True)
+    DateTime = partial(field, fields.DateTime, required=True)
+    URL = partial(field, fields.URL, required=True)
+    Time = partial(field, fields.Time, required=True)
+    Str = partial(field, fields.Str, required=True)
+    Bool = partial(field, fields.Bool, required=True)
+    String = partial(field, fields.String, required=True)
+    Url = partial(field, fields.Url, required=True)
+    LocalDateTime = partial(field, fields.LocalDateTime, required=True)
+    Float = partial(field, fields.Float, required=True)
+    Email = partial(field, fields.Email, required=True)
+    Date = partial(field, fields.Date, required=True)
+    Int = partial(field, fields.Int, required=True)
+    TimeDelta = partial(field, fields.TimeDelta, required=True)
+    UUID = partial(field, fields.UUID, required=True)
+    Function = partial(field, fields.Function, required=True)
+    FormattedString = partial(field, fields.FormattedString, required=True)
+    Number = partial(field, fields.Number, required=True)
+    Method = partial(field, fields.Method, required=True)
+    Raw = partial(field, fields.Raw, required=True)
+    Select = partial(field, select_wrap, required=True)
+    Fixed = partial(field, fields.Fixed, required=True)
+    QuerySelect = partial(field, fields.QuerySelect, required=True)
+    ValidatedField = partial(field, fields.ValidatedField, required=True)
+    Integer = partial(field, fields.Integer, required=True)
+    QuerySelectList = partial(field, fields.QuerySelectList, required=True)
+    Boolean = partial(field, fields.Boolean, required=True)
+    List = partial(field, fields.List, required=True)
 
 # from prestring.python import PythonModule
 # m = PythonModule()
 # for k, v in fields.__dict__.items():
-#     if isinstance(v, type) and issubclass(v, fields.Field):
-#         m.stmt("{}Field = partial(field, fields.{})".format(k, k))
+#     if isinstance(v, type) and issubclass(v, fields.):
+#         m.stmt("{} = partial(field, fields.{})".format(k, k))
 # print(m)

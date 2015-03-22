@@ -2,13 +2,13 @@ import marshmallow_form as mf
 
 
 class PersonForm(mf.Form):
-    name = mf.StringField(label="名前", placeholder="foo")
-    age = mf.IntegerField(label="年齢", placeholder="0")
+    name = mf.String(label="名前", placeholder="foo")
+    age = mf.Integer(label="年齢", placeholder="0")
 
 
 class ParentsForm(mf.Form):
-    father = mf.NestedField(PersonForm.schema_factory)
-    mother = mf.NestedField(PersonForm.schema_factory)
+    father = mf.Nested(PersonForm.schema_factory)
+    mother = mf.Nested(PersonForm.schema_factory)
 
 # print(PersonForm.schema_factory)
 # print(PersonForm(options={"many": True}).schema)

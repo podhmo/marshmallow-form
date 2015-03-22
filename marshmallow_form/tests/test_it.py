@@ -9,8 +9,8 @@ class RenderingTests(unittest.TestCase):
         import marshmallow_form as mf
 
         class PersonForm(self._getTarget()):
-            name = mf.StringField(doc="名前")
-            age = mf.IntegerField()
+            name = mf.String(doc="名前")
+            age = mf.Integer()
         return PersonForm
 
     def test_accessing_metadata(self):
@@ -33,13 +33,13 @@ class RenderingTests(unittest.TestCase):
     def test_add_field(self):
         import marshmallow_form as mf
         form = self._makeOne()()
-        form.add_field("birth", mf.DateField(required=True, doc="生まれ"))
+        form.add_field("birth", mf.Date(required=True, doc="生まれ"))
         self.assertEqual(form.birth["doc"], "生まれ")
 
     def test_add_field__no_effect_at_other_instance(self):
         import marshmallow_form as mf
         form = self._makeOne()()
-        form.add_field("birth", mf.DateField(required=True, doc="生まれ"))
+        form.add_field("birth", mf.Date(required=True, doc="生まれ"))
         other = self._makeOne()()
         with self.assertRaises(AttributeError):
             other.birth
@@ -65,7 +65,7 @@ class RenderingTests(unittest.TestCase):
         itr = (Point(i, i * 10) for i in range(1, 4))
         query = lambda: itr
         form = self._makeOne()()
-        form.add_field("points", mf.QuerySelectField(query, lambda o: o.id))
+        form.add_field("points", mf.QuerySelect(query, lambda o: o.id))
         expected = [(1, 'Point(id=1, value=10)'), (2, 'Point(id=2, value=20)'), (3, 'Point(id=3, value=30)')]
         result = list(form.points.choices)
         self.assertEqual(result, expected)
@@ -79,8 +79,8 @@ class ValidationTests(unittest.TestCase):
         import marshmallow_form as mf
 
         class PersonForm(self._getTarget()):
-            name = mf.StringField(doc="名前")
-            age = mf.IntegerField()
+            name = mf.String(doc="名前")
+            age = mf.Integer()
         return PersonForm
 
     def test_success(self):
