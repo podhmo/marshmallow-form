@@ -2,6 +2,8 @@
 import logging
 from functools import partial
 from marshmallow import fields
+from marshmallow.compat import text_type
+from .lazylist import LazyList
 logger = logging.getLogger(__name__)
 
 
@@ -69,6 +71,14 @@ class BoundField(object):
 
     def __getattr__(self, k):
         return getattr(self.field, k)
+
+    def disabled(self):
+        self.metadata["disabled"] = True
+
+    @reify
+    def choices(self):
+        labelgetter = self.metadata.get("labelgetter") or text_type
+        return LazyList(self.field.labels(labelgetter))
 
     @reify
     def value(self):
@@ -157,6 +167,7 @@ class FormBase(object):
 Form = FormMeta("Form", (FormBase, ), {})
 
 
+# TODO:
 class ModelForm(Form):
     def __init__(self, *args, **kwargs):
         self.model = kwargs.pop("model", None)

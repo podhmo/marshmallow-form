@@ -58,6 +58,20 @@ class RenderingTests(unittest.TestCase):
         result = list(f.name for f in other)
         self.assertEqual(result, ["name", "age"])
 
+    def test_choices(self):
+        import marshmallow_form as mf
+        from collections import namedtuple
+        Point = namedtuple("Point", "id value")
+        itr = (Point(i, i * 10) for i in range(1, 4))
+        query = lambda: itr
+        form = self._makeOne()()
+        form.add_field("points", mf.QuerySelectField(query, lambda o: o.id))
+        expected = [(1, 'Point(id=1, value=10)'), (2, 'Point(id=2, value=20)'), (3, 'Point(id=3, value=30)')]
+        result = list(form.points.choices)
+        self.assertEqual(result, expected)
+        result2 = list(form.points.choices)
+        self.assertEqual(result2, expected)
+
 
 @test_target("marshmallow_form:Form")
 class ValidationTests(unittest.TestCase):
