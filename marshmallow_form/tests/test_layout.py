@@ -3,11 +3,19 @@ import unittest
 
 
 def transcribe(target):
-    from marshmallow_form import BoundField
+    from marshmallow_form import LColumn, Form, BoundField
     if isinstance(target, BoundField):
         return target.name
-    else:
+    if isinstance(target, Form):
         return [transcribe(row) for row in target]
+    elif isinstance(target, (list, tuple)):
+        if isinstance(target[0], LColumn):
+            lcolumn, fields = target
+            return "{}:({})".format(lcolumn["widget"], ", ".join([transcribe(field) for field in fields]))
+        else:
+            return [transcribe(row) for row in target]
+    else:
+        raise Exception("oops")
 
 
 class LayoutTests(unittest.TestCase):
@@ -54,20 +62,26 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_layout(self):
-        from marshmallow_form import Layout
+        from marshmallow_form import Layout, LColumn
 
         class LayoutedForm(self._makeBase()):
             class Meta:
                 layout = Layout([
-                    ("info.tel", "info.zip"),
-                    ("info.address.country", "info.address.prefecture", "info.address.city", "info.address.street"),
-                    (("father.name", "father.age"), ("mother.name", "mother.age"))
+                    LColumn("info.tel", "info.zip", widget="row"),
+                    LColumn("info.address.country",
+                            "info.address.prefecture",
+                            "info.address.city",
+                            "info.address.street", widget="row"),
+                    (LColumn("father.name", "father.age", widget="person"),
+                     LColumn("mother.name", "mother.age", widget="person"))
                 ])
         form = LayoutedForm()
         result = transcribe(form)
-        expected = [['info.tel', 'info.zip'],
-                    ['info.address.country', 'info.address.prefecture', 'info.address.city', 'info.address.street'],
-                    [['father.name', 'father.age'], ['mother.name', 'mother.age']]]
+        expected = [
+            'row:(info.tel, info.zip)',
+            'row:(info.address.country, info.address.prefecture, info.address.city, info.address.street)',
+            ['person:(father.name, father.age)', 'person:(mother.name, mother.age)']
+        ]
         self.assertEqual(result, expected)
 
     def test_layout__too_few(self):
@@ -78,13 +92,17 @@ class LayoutTests(unittest.TestCase):
                     layout = Layout([])
 
     def test_layout__too_many(self):
-        from marshmallow_form import Layout, LayoutTooMany
+        from marshmallow_form import Layout, LayoutTooMany, LColumn
         with self.assertRaises(LayoutTooMany):
             class LayoutedForm(self._makeBase()):
                 class Meta:
                     layout = Layout([
-                        ("aaaaa", "bbbb"),
-                        ("info.tel", "info.zip"),
-                        ("info.address.country", "info.address.prefecture", "info.address.city", "info.address.street"),
-                        (("father.name", "father.age"), ("mother.name", "mother.age"))
+                        LColumn("aaaa", widget="row"),
+                        LColumn("info.tel", "info.zip", widget="row"),
+                        LColumn("info.address.country",
+                                "info.address.prefecture",
+                                "info.address.city",
+                                "info.address.street", widget="row"),
+                        (LColumn("father.name", "father.age", widget="person"),
+                         LColumn("mother.name", "mother.age", widget="person"))
                     ])

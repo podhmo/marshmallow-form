@@ -212,7 +212,7 @@ class Layout(object):
         self.shape = shape
 
     def set_from_shape(self, shape, s):
-        if isinstance(shape, (tuple, list)):
+        if isinstance(shape, (tuple, list, LColumn)):
             for row in shape:
                 self.set_from_shape(row, s)
         else:
@@ -232,6 +232,9 @@ class Layout(object):
     def build_iterator(self, form, shape):
         if isinstance(shape, (list, tuple)):
             return [self.build_iterator(form, row) for row in shape]
+        elif isinstance(shape, LColumn):
+            fields = [self.build_iterator(form, row) for row in shape]
+            return (shape, fields)
         else:
             target = form
             for k in shape.split("."):
@@ -240,6 +243,18 @@ class Layout(object):
 
     def __call__(self, form):
         return iter(self.build_iterator(form, self.shape))
+
+
+class LColumn(object):
+    def __init__(self, *fields, **metadata):
+        self.fields = fields
+        self.metadata = metadata
+
+    def __getitem__(self, k):
+        return self.metadata[k]
+
+    def __iter__(self):
+        return iter(self.fields)
 
 
 class FlattenLayout(object):
