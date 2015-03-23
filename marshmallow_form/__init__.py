@@ -249,7 +249,7 @@ class FlattenLayout(object):
                 yield bfield
 
 
-class FlattenFormBase(object):
+class FormBase(object):
     itemgetter = staticmethod(lambda d, k: d.get(k, ""))
 
     def __init__(self, data=None, initial=None, prefix="", options={"strict": False}):
@@ -322,7 +322,7 @@ class FlattenFormBase(object):
         return self.schema.dump(data)
 
 
-Form = FlattenForm = FormMeta("FlattenForm", (FlattenFormBase, ), {})
+Form = FormMeta("Form", (FormBase, ), {})
 
 
 # TODO:
