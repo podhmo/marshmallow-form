@@ -8,6 +8,14 @@ from .lazylist import LazyList
 logger = logging.getLogger(__name__)
 
 
+class LayoutTooFew(Exception):
+    pass
+
+
+class LayoutTooMany(Exception):
+    pass
+
+
 class reify(object):
     def __init__(self, wrapped):
         self.wrapped = wrapped
@@ -155,13 +163,35 @@ class FormMeta(type):
     SchemaBase = Schema
 
     def __new__(self, name, bases, attrs):
+        # todo: rewrite
+        # - collecting schema
+        # - make_object
+        # - layout
+
         schema_attrs = {}
         fields = []
+
+        for b in bases:
+            if hasattr(b, "ordered_names"):
+                for k in b.ordered_names:
+                    v = getattr(b, k)
+                    schema_attrs[k] = v.expose()
+                    fields.append(v)
+
         for k, v in attrs.items():
             if hasattr(v, "expose"):
                 v.name = k
                 schema_attrs[k] = v.expose()
                 fields.append(v)
+
+        layout = None
+        if "Meta" in attrs:
+            layout = getattr(attrs["Meta"], "layout", None)
+
+        # this is meta of marshmallow Schema
+        class Meta:
+            ordered = True
+        schema_attrs["Meta"] = Meta
 
         if "make_object" in attrs:
             schema_attrs["make_object"] = attrs.pop("make_object")
@@ -169,7 +199,54 @@ class FormMeta(type):
         attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
         schema_class = self.SchemaBase.__class__(name.replace("Form", "Schema"), (self.SchemaBase, ), schema_attrs)
         attrs["schema_factory"] = schema_class
-        return super().__new__(self, name, bases, attrs)
+        cls = super().__new__(self, name, bases, attrs)
+
+        if layout is not None:
+            layout.check_shape(cls())
+        cls.layout = layout or FlattenLayout()
+        return cls
+
+
+class Layout(object):
+    def __init__(self, shape):
+        self.shape = shape
+
+    def set_from_shape(self, shape, s):
+        if isinstance(shape, (tuple, list)):
+            for row in shape:
+                self.set_from_shape(row, s)
+        else:
+            s.add(shape)
+
+    def check_shape(self, form):
+        actual_set = set()
+        self.set_from_shape(self.shape, actual_set)
+        expected_set = set(bf.name for bf in form)
+        diff = expected_set.difference(actual_set)
+        if diff:
+            raise LayoutTooFew(diff)
+        diff = actual_set.difference(expected_set)
+        if diff:
+            raise LayoutTooMany(diff)
+
+    def build_iterator(self, form, shape):
+        if isinstance(shape, (list, tuple)):
+            return [self.build_iterator(form, row) for row in shape]
+        else:
+            target = form
+            for k in shape.split("."):
+                target = getattr(target, k)
+            return target
+
+    def __call__(self, form):
+        return iter(self.build_iterator(form, self.shape))
+
+
+class FlattenLayout(object):
+    def __call__(self, form):
+        for name in form.ordered_names:
+            for bfield in getattr(form, name):
+                yield bfield
 
 
 class FlattenFormBase(object):
@@ -202,9 +279,7 @@ class FlattenFormBase(object):
         self.ordered_names.remove(name)
 
     def __iter__(self):
-        for name in self.ordered_names:
-            for bfield in getattr(self, name):
-                yield bfield
+        return iter(self.layout(self))
 
     def _parsing_iterator(self, name, field):
         if hasattr(field, "nested"):
