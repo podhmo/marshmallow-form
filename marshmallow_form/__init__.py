@@ -4,15 +4,20 @@ import copy
 from functools import partial
 from marshmallow import fields
 from marshmallow.compat import text_type
+from marshmallow.exceptions import MarshmallowError
 from .lazylist import LazyList
 logger = logging.getLogger(__name__)
 
 
-class LayoutTooFew(Exception):
+class MarshmallowFormError(MarshmallowError):
     pass
 
 
-class LayoutTooMany(Exception):
+class LayoutTooFew(MarshmallowFormError):
+    pass
+
+
+class LayoutTooMany(MarshmallowFormError):
     pass
 
 
@@ -42,6 +47,15 @@ class Counter(object):
         return v
 
 C = Counter(0)
+
+
+class RegisterAction(object):
+    def __init__(self, action, method):
+        self.action = action
+        self.method = method
+
+    def register(self, schema):
+        self.action(schema, self.method)
 
 
 class Field(object):
@@ -169,20 +183,28 @@ class FormMeta(type):
         # - layout
 
         schema_attrs = {}
-        fields = []
-
+        fields = {}
+        register_actions = []
+        schema_bases = []
         for b in bases:
             if hasattr(b, "ordered_names"):
                 for k in b.ordered_names:
                     v = getattr(b, k)
                     schema_attrs[k] = v.expose()
-                    fields.append(v)
+                    fields[k] = v
+            if hasattr(b, "Schema") and issubclass(b.Schema, self.Schema):
+                if b.Schema not in schema_bases:
+                    schema_bases.append(b.Schema)
+        if len(schema_bases) <= 0:
+            schema_bases.append(self.SchemaBase)
 
         for k, v in attrs.items():
             if hasattr(v, "expose"):
                 v.name = k
                 schema_attrs[k] = v.expose()
-                fields.append(v)
+                fields[k] = v
+            if hasattr(v, "register") and callable(v.register):
+                register_actions.append(v)
 
         layout = None
         if "Meta" in attrs:
@@ -196,14 +218,20 @@ class FormMeta(type):
         if "make_object" in attrs:
             schema_attrs["make_object"] = attrs.pop("make_object")
 
-        attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
-        schema_class = self.SchemaBase.__class__(name.replace("Form", "Schema"), (self.SchemaBase, ), schema_attrs)
+        attrs["ordered_names"] = [f.name for f in sorted(fields.values(), key=lambda f: f._c)]
+        attrs["register_actions"] = register_actions
+        schema_class = self.SchemaBase.__class__(
+            name.replace("Form", "Schema"),
+            tuple(schema_bases),
+            schema_attrs)
         attrs["Schema"] = schema_class
         cls = super().__new__(self, name, bases, attrs)
 
         if layout is not None:
             layout.check_shape(cls())
         cls.layout = layout or FlattenLayout()
+        for ac in register_actions:
+            ac.register(cls.Schema)
         return cls
 
 
@@ -266,6 +294,11 @@ class FlattenLayout(object):
 
 class FormBase(object):
     itemgetter = staticmethod(lambda d, k: d.get(k, ""))
+    error_handler = partial(RegisterAction, (lambda schema, method: schema.error_handler(method)))
+    data_handler = partial(RegisterAction, (lambda schema, method: schema.data_handler(method)))
+    validator = partial(RegisterAction, (lambda schema, method: schema.validator(method)))
+    preprocessor = partial(RegisterAction, (lambda schema, method: schema.preprocessor(method)))
+    accessor = partial(RegisterAction, (lambda schema, method: schema.accessor(method)))
 
     def __init__(self, data=None, initial=None, prefix="", options={"strict": False}):
         self.options = options

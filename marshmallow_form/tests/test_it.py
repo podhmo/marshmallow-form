@@ -81,6 +81,87 @@ class RenderingTests(unittest.TestCase):
 
 
 @test_target("marshmallow_form:Form")
+class InheritanceTests(unittest.TestCase):
+    def test_it(self):
+        import marshmallow_form as mf
+        Class = self._getTarget()
+
+        class Base(Class):
+            name = mf.String()
+
+        class Inherited(Base):
+            age = mf.Int()
+
+        form = Inherited()
+        result = [f.name for f in form]
+        expected = ["name", "age"]
+        self.assertEqual(result, expected)
+
+    def test_it2(self):
+        import marshmallow_form as mf
+        Class = self._getTarget()
+
+        class Base(Class):
+            name = mf.String(doc="base")
+
+        class Inherited(Base):
+            name = mf.Int(doc="inherited")
+            age = mf.Int()
+
+        form = Inherited()
+        result = [f.name for f in form]
+        expected = ["name", "age"]
+        self.assertEqual(result, expected)
+        self.assertEqual(form.name["doc"], "inherited")
+
+    def test_it3(self):
+        import marshmallow_form as mf
+        Class = self._getTarget()
+
+        class Name(Class):
+            name = mf.String()
+
+        class Age(Class):
+            age = mf.Int()
+
+        class Date(Class):
+            year = mf.Int()
+            month = mf.Int()
+            day = mf.Int()
+
+        class CTime(Class):
+            ctime = mf.Nested(Date)
+
+        class UTime(Class):
+            utime = mf.Nested(Date)
+
+        class Inherited(Name, Age, CTime, UTime):
+            pass
+
+        form = Inherited()
+        result = [f.name for f in form]
+        expected = ["name", "age", "ctime.year", "ctime.month", "ctime.day", "utime.year", "utime.month", "utime.day"]
+        self.assertEqual(result, expected)
+
+    def test_validation(self):
+        Class = self._getTarget()
+        marker = object()
+        r = []
+
+        class Base(Class):
+            @Class.validator
+            def validate(self, data):
+                r.append(marker)
+
+        class Inherited(Base):
+            pass
+
+        form = Inherited()
+        form.deserialize({})
+        self.assertEqual(r, [marker])
+
+
+@test_target("marshmallow_form:Form")
 class NestedTests(unittest.TestCase):
     def _makeOne(self, *args, **kwargs):
         from collections import namedtuple
