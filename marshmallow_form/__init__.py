@@ -198,7 +198,7 @@ class FormMeta(type):
 
         attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
         schema_class = self.SchemaBase.__class__(name.replace("Form", "Schema"), (self.SchemaBase, ), schema_attrs)
-        attrs["schema_factory"] = schema_class
+        attrs["Schema"] = schema_class
         cls = super().__new__(self, name, bases, attrs)
 
         if layout is not None:
@@ -277,7 +277,7 @@ class FormBase(object):
 
     @reify
     def schema(self):
-        return self.schema_factory(**self.options)
+        return self.Schema(**self.options)
 
     def add_field(self, name, field):
         if hasattr(field, "expose"):
@@ -354,7 +354,7 @@ def select_wrap(pairs, *args, **kwargs):
 
 
 def nested_wrap(formclass, *args, **kwargs):
-    schema = formclass.schema_factory
+    schema = formclass.Schema
     return fields.Nested(schema, *args, **kwargs)
 
 
