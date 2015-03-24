@@ -315,11 +315,9 @@ class FormBase(object):
     @classmethod
     def from_object(cls, ob, *args, **kwargs):
         form = cls(*args, **kwargs)
-        result = form.schema.dump(ob)
-        if result.errors:
-            raise MarshallingError(result.errors)
-        form.rawdata = result.data
-        form.data = form.rawdata.copy()
+        data = form.serialize(ob)
+        form.rawdata = data
+        form.data = data.copy()
         return form
 
     def add_field(self, name, field):
@@ -367,18 +365,31 @@ class FormBase(object):
     def has_errors(self):
         return bool(self.errors)
 
-    def deserialize(self, data=None, cleansing=True):
+    def validate(self, data=None, cleansing=True):
+        self.deserialize(data=data, cleansing=True)
+        return not self.has_errors()
+
+    def load(self, data=None, cleansing=True):
         data = data or self.data
         if cleansing:
             data = self.cleansing(data)
-        result = self.schema.load(data)
+        return self.schema.load(data)
+
+    def deserialize(self, data=None, cleansing=True):
+        result = self.load(data=data, cleansing=cleansing)
         self.errors = result.errors
+        self.data = result.data
         return result.data
 
-    def serialize(self, data=None):
+    def dump(self, data=None):
         data = data or self.data
         return self.schema.dump(data)
 
+    def serialize(self, data=None):
+        result = self.dump(data=data)
+        if result.errors:
+            raise MarshallingError(result.errors)
+        return result.data
 
 Form = FormMeta("Form", (FormBase, ), {})
 
