@@ -344,7 +344,7 @@ class FormBase(object):
             for k, f in self._parsing_iterator(name, f):
                 d = result
                 v = data.get(self.prefix + k, "")
-                if v == "" and not isinstance(f, fields.String):
+                if v == "" and (f.required or not isinstance(f, fields.String)):
                     continue
                 ts = k.split(".")
                 for t in ts[:-1]:

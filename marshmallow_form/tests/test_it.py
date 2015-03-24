@@ -258,7 +258,7 @@ class NestedTests2(unittest.TestCase):
         Class = self._getTarget()
 
         class X(Class):
-            name = mf.String()
+            name = mf.String(required=False)
 
         class Y(Class):
             x0 = mf.Nested(X)
