@@ -63,3 +63,25 @@ form = Form({})
 print(form.deserialize())
 # OrderedDict([('name', '')])
 
+
+########################################
+# pre_process
+########################################
+import marshmallow_form as mf
+from datetime import date
+from collections import namedtuple
+Person = namedtuple("Person", "name birth")
+
+
+class PersonForm(mf.Form):
+    name = mf.String()
+    birth = mf.Date()
+
+    @mf.Form.accessor
+    def access(self, k, ob):
+        return getattr(ob, k)
+
+person = Person(name="foo", birth=date(2000, 1, 1))
+form = PersonForm.from_object(person)
+print(type(form.birth.value), form.birth.value)
+# <class 'str'> 2000-01-01

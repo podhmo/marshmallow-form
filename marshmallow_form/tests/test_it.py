@@ -81,6 +81,40 @@ class RenderingTests(unittest.TestCase):
 
 
 @test_target("marshmallow_form:Form")
+class FromObjectTests(unittest.TestCase):
+    def test_it(self):
+        import marshmallow_form as mf
+        from datetime import date
+        Class = self._getTarget()
+
+        class Form(Class):
+            name = mf.String()
+            birth = mf.Date()
+
+        form = Form.from_object({"name": "foo", "birth": date(2000, 1, 1)})
+        self.assertEqual(form.birth.value, "2000-01-01")
+
+    def test_it2(self):
+        import marshmallow_form as mf
+        from datetime import date
+        from collections import namedtuple
+        Person = namedtuple("Person", "name birth")
+
+        Class = self._getTarget()
+
+        class Form(Class):
+            name = mf.String()
+            birth = mf.Date()
+
+            @Class.accessor
+            def access(self, k, ob):
+                return getattr(ob, k)
+
+        form = Form.from_object(Person(name="foo", birth=date(2000, 1, 1)))
+        self.assertEqual(form.birth.value, "2000-01-01")
+
+
+@test_target("marshmallow_form:Form")
 class InheritanceTests(unittest.TestCase):
     def test_it(self):
         import marshmallow_form as mf

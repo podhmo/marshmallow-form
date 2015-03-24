@@ -4,7 +4,7 @@ import copy
 from functools import partial
 from marshmallow import fields
 from marshmallow.compat import text_type
-from marshmallow.exceptions import MarshmallowError
+from marshmallow.exceptions import MarshmallowError, MarshallingError
 from .lazylist import LazyList
 logger = logging.getLogger(__name__)
 
@@ -311,6 +311,16 @@ class FormBase(object):
     @reify
     def schema(self):
         return self.Schema(**self.options)
+
+    @classmethod
+    def from_object(cls, ob, *args, **kwargs):
+        form = cls(*args, **kwargs)
+        result = form.schema.dump(ob)
+        if result.errors:
+            raise MarshallingError(result.errors)
+        form.rawdata = result.data
+        form.data = form.rawdata.copy()
+        return form
 
     def add_field(self, name, field):
         if hasattr(field, "expose"):
