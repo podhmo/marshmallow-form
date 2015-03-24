@@ -15,7 +15,7 @@ def same(schema, data):
 
 input_data = {"name": "foo", "password": "*", "password_confirm": "+"}
 form = AuthenticationForm(input_data)
-form.deserialize()
+print(form.validate())
 print(form.errors)
 # ["Schema validator same({'password_confirm': '+', 'name': 'foo', 'password': '*'}) is False"]
 
@@ -40,6 +40,6 @@ class AuthenticationForm(mf.Form):
 
 input_data = {"name": "foo", "password": "*", "password_confirm": "+"}
 form = AuthenticationForm(input_data)
-form.deserialize()
+print(form.validate())
 print(form.errors)
 {'password': ['Too short! 5.', 'not same!']}
