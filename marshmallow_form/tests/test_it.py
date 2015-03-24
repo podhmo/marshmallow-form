@@ -113,6 +113,11 @@ class FromObjectTests(unittest.TestCase):
         form = Form.from_object(Person(name="foo", birth=date(2000, 1, 1)))
         self.assertEqual(form.birth.value, "2000-01-01")
 
+        form = Form({"name": "foo", "birth": "2000-01-01"})
+        result = form.deserialize()
+        expected = {"name": "foo", "birth": date(2000, 1, 1)}
+        self.assertEqual(result, expected)
+
 
 @test_target("marshmallow_form:Form")
 class InheritanceTests(unittest.TestCase):
