@@ -57,6 +57,11 @@ class BoundField(object):
         else:
             return self.field.metadata
 
+    def __call__(self):
+        if "__call__" in self.metadata:
+            return self.metadata["__call__"](self)
+        return self.value
+
     def __getitem__(self, k):
         return self.form.itemgetter(self.metadata, k)
 

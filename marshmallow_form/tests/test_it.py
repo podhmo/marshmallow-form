@@ -8,8 +8,11 @@ class RenderingTests(unittest.TestCase):
     def _makeOne(self, *args, **kwargs):
         import marshmallow_form as mf
 
+        def input_tag(self):
+            return '<input name="{self.name}" value="{self.value}">'.format(self=self)
+
         class PersonForm(self._getTarget()):
-            name = mf.String(doc="名前")
+            name = mf.String(doc="名前", __call__=input_tag)
             age = mf.Integer()
         return PersonForm(*args, **kwargs)
 
@@ -24,6 +27,10 @@ class RenderingTests(unittest.TestCase):
     def test_accessing_value(self):
         form = self._makeOne({"name": "foo"})
         self.assertEqual(form.name.value, "foo")
+
+    def test_define_call_method(self):
+        form = self._makeOne({"name": "foo"})
+        self.assertEqual(form.name(), '<input name="name" value="foo">')
 
     def test_iterate_order(self):
         form = self._makeOne()
