@@ -13,6 +13,26 @@ class Tests(unittest.TestCase):
         import marshmallow_form as mf
         return mf.Nested(*args, **kwargs)
 
+    @unittest.skip("not supported")
+    def test_form_many(self):
+        Class = self._getTarget()
+
+        class PersonForm(Class):
+            name = self._makeString()
+
+        class person0:
+            name = "foo"
+
+        class person1:
+            name = "bar"
+
+        class person2:
+            name = "boo"
+        ob = [person0, person1, person2]
+        form = PersonForm.from_object(ob, options={"many": True})
+        for c in form:
+            print(c)
+
     def test_field_many(self):
         Class = self._getTarget()
 
