@@ -51,6 +51,7 @@ class FormMeta(type):
             attrs[k] = Field(f, name=k)
             fields.append(attrs[k])
         attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
+
         cls = super(FormMeta, self).__new__(self, name, bases, attrs)
 
         if layout is not None:

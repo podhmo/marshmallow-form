@@ -21,6 +21,23 @@ class FactoryTests(unittest.TestCase):
         expected = {"name": "foo", "age": 10}
         self.assertEqual(result, expected)
 
+    def test_validation(self):
+        from marshmallow import Schema, fields
+
+        class LoginSchema(Schema):
+            name = fields.Str()
+            password = fields.Str()
+            password_confirm = fields.Str()
+
+        @LoginSchema.validator
+        def confirm_password(self, data):
+            return data["password"] == data["password_confirm"]
+
+        Form = self._callFUT("LoginForm", LoginSchema)
+        assert Form.Schema == LoginSchema
+        form = Form({"name": "foo", "password": "*", "password_confirm": "+"})
+        self.assertFalse(form.validate())
+
     def test_with_nested(self):
         from marshmallow import Schema, fields
 
