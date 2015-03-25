@@ -80,7 +80,7 @@ class Field(object):
 
 def bound_field(name, field, ob, key=None, overrides=None):
     if hasattr(field, "nested"):
-        return NestedBoundField(name, field, ob)
+        return NestedBoundField(name, field, ob, overrides=overrides)
     else:
         return BoundField(name, field, ob, key=key, overrides=overrides)
 
@@ -143,10 +143,11 @@ class SubForm(object):
 
 
 class NestedBoundField(BoundField):
-    def __init__(self, name, field, form):
+    def __init__(self, name, field, form, overrides=None):
         self._name = name
         self.field = field
         self.form = form
+        self.overrides = overrides
 
     @reify
     def children(self):
@@ -157,9 +158,12 @@ class NestedBoundField(BoundField):
             for f in getattr(self, k):
                 yield f
 
-    @property
+    @reify
     def metadata(self):
-        return self.field.metadata
+        if self.overrides:
+            return ChainMap(self.overrides, self.field.metadata)
+        else:
+            return self.field.metadata
 
     def __getitem__(self, k):
         return self.form.itemgetter(self.metadata, k)
