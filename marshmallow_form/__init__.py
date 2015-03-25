@@ -2,6 +2,7 @@
 import logging
 import copy
 from functools import partial
+from collections import ChainMap
 from marshmallow import fields
 from marshmallow.compat import text_type
 from marshmallow.exceptions import MarshmallowError, MarshallingError
@@ -72,31 +73,35 @@ class Field(object):
             return self
         name = self.name
         field = ob.schema.fields[name]
-        bf = bound_field(name, field, ob)
+        bf = bound_field(name, field, ob, overrides=ob.metadata.get(name))
         ob.__dict__[name] = bf
         return bf
 
 
-def bound_field(name, field, ob, key=None):
+def bound_field(name, field, ob, key=None, overrides=None):
     if hasattr(field, "nested"):
         return NestedBoundField(name, field, ob)
     else:
-        return BoundField(name, field, ob, key=key)
+        return BoundField(name, field, ob, key=key, overrides=overrides)
 
 
 class BoundField(object):
-    def __init__(self, name, field, form, key=None):
+    def __init__(self, name, field, form, key=None, overrides=None):
         self.name = name
         self.key = key or name
         self.field = field
         self.form = form
+        self.overrides = overrides
 
     def __iter__(self):
         yield self
 
-    @property
+    @reify
     def metadata(self):
-        return self.field.metadata
+        if self.overrides:
+            return ChainMap(self.overrides, self.field.metadata)
+        else:
+            return self.field.metadata
 
     def __getitem__(self, k):
         return self.form.itemgetter(self.metadata, k)
@@ -163,7 +168,8 @@ class NestedBoundField(BoundField):
         if k not in self.children:
             raise AttributeError(k)
         subform = SubForm.from_form(self._name, self.form)
-        bf = bound_field("{}.{}".format(self._name, k), self.children[k], subform, key=k)
+        name = "{}.{}".format(self._name, k)
+        bf = bound_field(name, self.children[k], subform, key=k, overrides=self.metadata.get(k))
         setattr(self, k, bf)
         return bf
 
@@ -212,8 +218,15 @@ class FormMeta(type):
 
         layout = None
         if "Meta" in attrs:
-            layout = getattr(attrs["Meta"], "layout", None)
-            metadata.update(getattr(attrs["Meta"], "metadata", {}))
+            meta = attrs["Meta"]
+            layout = getattr(meta, "layout", None)
+            metadata.update(getattr(meta, "metadata", {}))
+            metadata.update(getattr(meta, "overrides", {}))
+            if hasattr(meta, "itemgetter"):
+                if isinstance(meta.itemgetter, staticmethod):
+                    attrs["itemgetter"] = meta.itemgetter
+                else:
+                    attrs["itemgetter"] = staticmethod(meta.itemgetter)
 
         # this is meta of marshmallow Schema
         class Meta:
@@ -403,7 +416,7 @@ class FormBase(object):
         return result.data
 
     def __getitem__(self, k):
-        return self.metadata[k]
+        return self.itemgetter(self.metadata, k)
 
 Form = FormMeta("Form", (FormBase, ), {})
 
@@ -423,6 +436,7 @@ def select_wrap(pairs, *args, **kwargs):
 
 def nested_wrap(formclass, *args, **kwargs):
     schema = formclass.Schema
+    kwargs.update(kwargs.pop("overrides", {}))
     return fields.Nested(schema, *args, **kwargs)
 
 

@@ -199,31 +199,126 @@ class InheritanceTests(unittest.TestCase):
         form.deserialize({})
         self.assertEqual(r, [marker])
 
-    def test_metadata(self):
+
+@test_target("marshmallow_form:Form")
+class MetaDataTests(unittest.TestCase):
+    def _makeField(self, *args, **kwargs):
+        import marshmallow_form as mf
+        return mf.String(*args, **kwargs)
+
+    def _makeNested(self, *args, **kwargs):
+        import marshmallow_form as mf
+        return mf.Nested(*args, **kwargs)
+
+    def test_field_missing(self):
+        Class = self._getTarget()
+
+        class Form(Class):
+            name = self._makeField()
+        form = Form()
+        self.assertEqual(form.name["doc"], "")
+
+    def test_field(self):
+        Class = self._getTarget()
+
+        class Form(Class):
+            name = self._makeField(doc="this is name")
+        form = Form()
+        self.assertEqual(form.name["doc"], "this is name")
+
+    def test_field_nested(self):
+        Class = self._getTarget()
+
+        class Named(Class):
+            name = self._makeField(doc="this is name")
+
+        class Form(Class):
+            box = self._makeNested(Named)
+        form = Form()
+        self.assertEqual(form.box.name["doc"], "this is name")
+
+    def test_field_nested__overrides(self):
+        Class = self._getTarget()
+
+        class Named(Class):
+            name = self._makeField(doc="this is name")
+
+        class Form(Class):
+            box = self._makeNested(Named, overrides={"name": {"doc": "this is box name"}})
+        form = Form()
+        self.assertEqual(form.box.name["doc"], "this is box name")
+
+    def test_field_inheritance(self):
+        Class = self._getTarget()
+
+        class Named(Class):
+            name = self._makeField(doc="this is name")
+
+        class Form(Named):
+            pass
+        form = Form()
+        self.assertEqual(form.name["doc"], "this is name")
+
+    def test_field_inheritance_overrides(self):
+        Class = self._getTarget()
+
+        class Named(Class):
+            name = self._makeField(doc="this is name")
+
+        class Form(Named):
+            class Meta:
+                overrides = {"name": {"doc": "*this is name*"}}
+        form = Form()
+        self.assertEqual(form.name["doc"], "*this is name*")
+
+    def test_form(self):
+        Class = self._getTarget()
+
+        class Form(Class):
+            class Meta:
+                metadata = {"doc": "this is form"}
+        form = Form()
+        self.assertEqual(form["doc"], "this is form")
+
+    def test_form_inheritance(self):
         Class = self._getTarget()
 
         class Base(Class):
             class Meta:
-                metadata = {"description": "this is base"}
+                metadata = {"doc": "this is base"}
 
-        class HasName(Class):
-            class Meta:
-                metadata = {"doc": "doc is important"}
-
-        class Form(Base, HasName):
-            class Meta:
-                metadata = {"name": "form"}
+        class Form(Base):
+            pass
 
         form = Form()
-        self.assertEqual(form["doc"], "doc is important")
-        self.assertEqual(form["description"], "this is base")
-        self.assertEqual(form["name"], "form")
-        form.metadata["info"] = "help me"
-        self.assertEqual(form["info"], "help me")
+        self.assertEqual(form["doc"], "this is base")
 
-        another = Form()
+    def test_form_inheritance_overrides(self):
+        Class = self._getTarget()
+
+        class Base(Class):
+            class Meta:
+                metadata = {"doc": "this is base"}
+
+        class Form(Base):
+            class Meta:
+                metadata = {"doc": "this is form"}
+
+        form = Form()
+        self.assertEqual(form["doc"], "this is form")
+
+    def test_change_itemgetter(self):
+        Class = self._getTarget()
+
+        class Form(Class):
+            name = self._makeField()
+
+            class Meta:
+                itemgetter = lambda d, k: d[k]
+
+        form = Form()
         with self.assertRaises(KeyError):
-            another["info"]
+            form.name["doc"]
 
 
 @test_target("marshmallow_form:Form")
