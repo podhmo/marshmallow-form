@@ -3,7 +3,8 @@ import unittest
 
 
 def transcribe(target):
-    from marshmallow_form import LColumn, Form, BoundField
+    from marshmallow_form import Form, BoundField
+    from marshmallow_form.layout import LColumn
     if isinstance(target, BoundField):
         return target.name
     if isinstance(target, Form):
@@ -62,7 +63,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_layout(self):
-        from marshmallow_form import Layout, LColumn
+        from marshmallow_form.layout import Layout, LColumn
 
         class LayoutedForm(self._makeBase()):
             class Meta:
@@ -85,14 +86,14 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_layout__too_few(self):
-        from marshmallow_form import Layout, LayoutTooFew
+        from marshmallow_form.layout import Layout, LayoutTooFew
         with self.assertRaises(LayoutTooFew):
             class LayoutedForm(self._makeBase()):
                 class Meta:
                     layout = Layout([])
 
     def test_layout__too_many(self):
-        from marshmallow_form import Layout, LayoutTooMany, LColumn
+        from marshmallow_form.layout import Layout, LayoutTooMany, LColumn
         with self.assertRaises(LayoutTooMany):
             class LayoutedForm(self._makeBase()):
                 class Meta:

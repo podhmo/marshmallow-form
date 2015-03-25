@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 import marshmallow_form as mf
-
+from marshmallow_form.layout import Layout, LColumn
 
 class DateTriple(mf.Form):
     year = mf.Int()
@@ -14,10 +14,10 @@ class PersonForm(mf.Form):
     birth = mf.Nested(DateTriple)
 
     class Meta:
-        layout = mf.Layout([
-            mf.LColumn("name", widget="default"),
-            mf.LColumn("age", widget="default"),
-            mf.LColumn("birth.year", "birth.month", "birth.day", widget="date"),
+        layout = Layout([
+            LColumn("name", widget="default"),
+            LColumn("age", widget="default"),
+            LColumn("birth.year", "birth.month", "birth.day", widget="date"),
         ])
 
 

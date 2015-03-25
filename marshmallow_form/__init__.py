@@ -2,52 +2,15 @@
 import logging
 import copy
 from functools import partial
-from collections import ChainMap
 from marshmallow import fields
-from marshmallow.compat import text_type
-from marshmallow.exceptions import MarshmallowError, MarshallingError
-from .lazylist import LazyList
+from marshmallow.exceptions import MarshallingError
+from .langhelpers import reify
+from .layout import FlattenLayout
+from .factories import (
+    BoundField,
+    field_factory,
+)
 logger = logging.getLogger(__name__)
-
-
-class MarshmallowFormError(MarshmallowError):
-    pass
-
-
-class LayoutTooFew(MarshmallowFormError):
-    pass
-
-
-class LayoutTooMany(MarshmallowFormError):
-    pass
-
-
-class reify(object):
-    def __init__(self, wrapped):
-        self.wrapped = wrapped
-        try:
-            self.__doc__ = wrapped.__doc__
-        except:  # pragma: no cover
-            pass
-
-    def __get__(self, inst, objtype=None):
-        if inst is None:
-            return self
-        val = self.wrapped(inst)
-        setattr(inst, self.wrapped.__name__, val)
-        return val
-
-
-class Counter(object):
-    def __init__(self, i):
-        self.i = i
-
-    def __call__(self):
-        v = self.i
-        self.i += 1
-        return v
-
-C = Counter(0)
 
 
 class RegisterAction(object):
@@ -57,129 +20,6 @@ class RegisterAction(object):
 
     def register(self, schema):
         self.action(schema, self.method)
-
-
-class Field(object):
-    def __init__(self, field):
-        self.field = field
-        self.name = None
-        self._c = C()
-
-    def expose(self):
-        return self.field
-
-    def __get__(self, ob, type_):
-        if ob is None:
-            return self
-        name = self.name
-        field = ob.schema.fields[name]
-        bf = bound_field(name, field, ob, overrides=ob.metadata.get(name))
-        ob.__dict__[name] = bf
-        return bf
-
-
-def bound_field(name, field, ob, key=None, overrides=None):
-    if hasattr(field, "nested"):
-        return NestedBoundField(name, field, ob, overrides=overrides)
-    else:
-        return BoundField(name, field, ob, key=key, overrides=overrides)
-
-
-class BoundField(object):
-    def __init__(self, name, field, form, key=None, overrides=None):
-        self.name = name
-        self.key = key or name
-        self.field = field
-        self.form = form
-        self.overrides = overrides
-
-    def __iter__(self):
-        yield self
-
-    @reify
-    def metadata(self):
-        if self.overrides:
-            return ChainMap(self.overrides, self.field.metadata)
-        else:
-            return self.field.metadata
-
-    def __getitem__(self, k):
-        return self.form.itemgetter(self.metadata, k)
-
-    def __getattr__(self, k):
-        return getattr(self.field, k)
-
-    def disabled(self):
-        self.metadata["disabled"] = True
-
-    @reify
-    def choices(self):
-        if "pairs" in self.metadata:
-            return self.metadata["pairs"]
-        elif hasattr(self.field, "labels"):
-            labelgetter = self.metadata.get("labelgetter") or text_type
-            return LazyList(self.field.labels(labelgetter))
-        else:
-            return []
-
-    @reify
-    def value(self):
-        return (self.form.data.get(self.key)
-                or self.form.initial.get(self.key)
-                or self.field.default)
-
-
-class SubForm(object):
-    def __init__(self, data, initial, itemgetter):
-        self.data = data
-        self.initial = initial
-        self.itemgetter = itemgetter
-
-    @classmethod
-    def from_form(cls, name, form):
-        data = (form.data.get(name) if form.data else None) or {}
-        initial = (form.initial.get(name) if form.initial else None) or {}
-        return cls(data, initial, itemgetter=form.itemgetter)
-
-
-class NestedBoundField(BoundField):
-    def __init__(self, name, field, form, overrides=None):
-        self._name = name
-        self.field = field
-        self.form = form
-        self.overrides = overrides
-
-    @reify
-    def children(self):
-        return copy.deepcopy(self.field.nested._declared_fields)
-
-    def __iter__(self):
-        for k in self.children.keys():
-            for f in getattr(self, k):
-                yield f
-
-    @reify
-    def metadata(self):
-        if self.overrides:
-            return ChainMap(self.overrides, self.field.metadata)
-        else:
-            return self.field.metadata
-
-    def __getitem__(self, k):
-        return self.form.itemgetter(self.metadata, k)
-
-    def __getattr__(self, k):
-        if k not in self.children:
-            raise AttributeError(k)
-        subform = SubForm.from_form(self._name, self.form)
-        name = "{}.{}".format(self._name, k)
-        bf = bound_field(name, self.children[k], subform, key=k, overrides=self.metadata.get(k))
-        setattr(self, k, bf)
-        return bf
-
-
-def field(fieldclass, *args, **kwargs):
-    return Field(fieldclass(*args, **kwargs))
 
 
 class FormMeta(type):
@@ -264,63 +104,6 @@ class FormMeta(type):
         for ac in register_actions:
             ac.register(cls.Schema)
         return cls
-
-
-class Layout(object):
-    def __init__(self, shape):
-        self.shape = shape
-
-    def set_from_shape(self, shape, s):
-        if isinstance(shape, (tuple, list, LColumn)):
-            for row in shape:
-                self.set_from_shape(row, s)
-        else:
-            s.add(shape)
-
-    def check_shape(self, form):
-        actual_set = set()
-        self.set_from_shape(self.shape, actual_set)
-        expected_set = set(bf.name for bf in form)
-        diff = expected_set.difference(actual_set)
-        if diff:
-            raise LayoutTooFew(diff)
-        diff = actual_set.difference(expected_set)
-        if diff:
-            raise LayoutTooMany(diff)
-
-    def build_iterator(self, form, shape):
-        if isinstance(shape, (list, tuple)):
-            return [self.build_iterator(form, row) for row in shape]
-        elif isinstance(shape, LColumn):
-            fields = [self.build_iterator(form, row) for row in shape]
-            return (shape, fields)
-        else:
-            target = form
-            for k in shape.split("."):
-                target = getattr(target, k)
-            return target
-
-    def __call__(self, form):
-        return iter(self.build_iterator(form, self.shape))
-
-
-class LColumn(object):
-    def __init__(self, *fields, **metadata):
-        self.fields = fields
-        self.metadata = metadata
-
-    def __getitem__(self, k):
-        return self.metadata[k]
-
-    def __iter__(self):
-        return iter(self.fields)
-
-
-class FlattenLayout(object):
-    def __call__(self, form):
-        for name in form.ordered_names:
-            for bfield in getattr(form, name):
-                yield bfield
 
 
 class FormBase(object):
@@ -451,42 +234,35 @@ def nested_wrap(formclass, *args, **kwargs):
 
 
 if __name__ != "__main__":
-    Nested = partial(field, nested_wrap, required=True)
+    Nested = field_factory(nested_wrap)
 
-    Price = partial(field, fields.Price, required=True)
-    Arbitrary = partial(field, fields.Arbitrary, required=True)
-    Decimal = partial(field, fields.Decimal, required=True)
-    DateTime = partial(field, fields.DateTime, required=True)
-    URL = partial(field, fields.URL, required=True)
-    Time = partial(field, fields.Time, required=True)
-    Str = partial(field, fields.Str, required=True)
-    Bool = partial(field, fields.Bool, required=True)
-    String = partial(field, fields.String, required=True)
-    Url = partial(field, fields.Url, required=True)
-    LocalDateTime = partial(field, fields.LocalDateTime, required=True)
-    Float = partial(field, fields.Float, required=True)
-    Email = partial(field, fields.Email, required=True)
-    Date = partial(field, fields.Date, required=True)
-    Int = partial(field, fields.Int, required=True)
-    TimeDelta = partial(field, fields.TimeDelta, required=True)
-    UUID = partial(field, fields.UUID, required=True)
-    Function = partial(field, fields.Function, required=True)
-    FormattedString = partial(field, fields.FormattedString, required=True)
-    Number = partial(field, fields.Number, required=True)
-    Method = partial(field, fields.Method, required=True)
-    Raw = partial(field, fields.Raw, required=True)
-    Select = partial(field, select_wrap, required=True)
-    Fixed = partial(field, fields.Fixed, required=True)
-    QuerySelect = partial(field, fields.QuerySelect, required=True)
-    ValidatedField = partial(field, fields.ValidatedField, required=True)
-    Integer = partial(field, fields.Integer, required=True)
-    QuerySelectList = partial(field, fields.QuerySelectList, required=True)
-    Boolean = partial(field, fields.Boolean, required=True)
-    List = partial(field, fields.List, required=True)
-
-# from prestring.python import PythonModule
-# m = PythonModule()
-# for k, v in fields.__dict__.items():
-#     if isinstance(v, type) and issubclass(v, fields.):
-#         m.stmt("{} = partial(field, fields.{})".format(k, k))
-# print(m)
+    Price = field_factory(fields.Price)
+    Arbitrary = field_factory(fields.Arbitrary)
+    Decimal = field_factory(fields.Decimal)
+    DateTime = field_factory(fields.DateTime)
+    URL = field_factory(fields.URL)
+    Time = field_factory(fields.Time)
+    Str = field_factory(fields.Str)
+    Bool = field_factory(fields.Bool)
+    String = field_factory(fields.String)
+    Url = field_factory(fields.Url)
+    LocalDateTime = field_factory(fields.LocalDateTime)
+    Float = field_factory(fields.Float)
+    Email = field_factory(fields.Email)
+    Date = field_factory(fields.Date)
+    Int = field_factory(fields.Int)
+    TimeDelta = field_factory(fields.TimeDelta)
+    UUID = field_factory(fields.UUID)
+    Function = field_factory(fields.Function)
+    FormattedString = field_factory(fields.FormattedString)
+    Number = field_factory(fields.Number)
+    Method = field_factory(fields.Method)
+    Raw = field_factory(fields.Raw)
+    Select = field_factory(select_wrap)
+    Fixed = field_factory(fields.Fixed)
+    QuerySelect = field_factory(fields.QuerySelect)
+    ValidatedField = field_factory(fields.ValidatedField)
+    Integer = field_factory(fields.Integer)
+    QuerySelectList = field_factory(fields.QuerySelectList)
+    Boolean = field_factory(fields.Boolean)
+    List = field_factory(fields.List)
