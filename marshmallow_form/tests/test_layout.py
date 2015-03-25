@@ -3,7 +3,8 @@ import unittest
 
 
 def transcribe(target):
-    from marshmallow_form import Form, BoundField
+    from marshmallow_form import Form
+    from marshmallow_form.boundfield import BoundField
     from marshmallow_form.layout import LColumn
     if isinstance(target, BoundField):
         return target.name

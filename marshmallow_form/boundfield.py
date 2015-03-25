@@ -1,16 +1,9 @@
 # -*- coding:utf-8 -*-
 import copy
-from functools import partial
 from collections import ChainMap
 from marshmallow.compat import text_type
 from .lazylist import LazyList
 from .langhelpers import reify, Counter
-
-
-def field_factory(marshmallow_field, **options):
-    if "required" not in options:
-        options["required"] = True
-    return partial(field, marshmallow_field, **options)
 
 
 def field(fieldclass, *args, **kwargs):
@@ -21,9 +14,9 @@ C = Counter(0)
 
 
 class Field(object):
-    def __init__(self, field):
+    def __init__(self, field, name=None):
         self.field = field
-        self.name = None
+        self.name = name
         self._c = C()
 
     def expose(self):

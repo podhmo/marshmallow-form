@@ -2,6 +2,7 @@
 import marshmallow_form as mf
 from marshmallow_form.layout import Layout, LColumn
 
+
 class DateTriple(mf.Form):
     year = mf.Int()
     month = mf.Int()

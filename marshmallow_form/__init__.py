@@ -6,9 +6,10 @@ from marshmallow import fields
 from marshmallow.exceptions import MarshallingError
 from .langhelpers import reify
 from .layout import FlattenLayout
-from .factories import (
-    BoundField,
-    field_factory,
+from .boundfield import (
+    field,
+    Field,
+    BoundField
 )
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,35 @@ class FormMeta(type):
     @staticmethod
     def access(self, k, ob):
         return getattr(ob, k)
+
+    @classmethod
+    def from_schema(self, name, schema, bases, attrs, meta=object()):
+        attrs["Schema"] = schema
+        metadata = attrs["metadata"] = {}
+
+        layout = None
+        layout = getattr(meta, "layout", None)
+        metadata.update(getattr(meta, "metadata", {}))
+        metadata.update(getattr(meta, "overrides", {}))
+        if hasattr(meta, "itemgetter"):
+            if isinstance(meta.itemgetter, staticmethod):
+                attrs["itemgetter"] = meta.itemgetter
+            else:
+                attrs["itemgetter"] = staticmethod(meta.itemgetter)
+
+        fields = []
+        for k, f in schema._declared_fields.items():
+            attrs[k] = Field(f, name=k)
+            fields.append(attrs[k])
+        attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
+        cls = super(FormMeta, self).__new__(self, name, bases, attrs)
+
+        if layout is not None:
+            layout.check_shape(cls())
+        cls.layout = layout or FlattenLayout()
+
+        cls.metadata = metadata
+        return cls
 
     def __new__(self, name, bases, attrs):
         # todo: rewrite
@@ -93,7 +123,7 @@ class FormMeta(type):
         # schema_class.accessor(self.access)
         attrs["Schema"] = schema_class
 
-        cls = super().__new__(self, name, bases, attrs)
+        cls = super(FormMeta, self).__new__(self, name, bases, attrs)
 
         if layout is not None:
             layout.check_shape(cls())
@@ -214,11 +244,22 @@ class FormBase(object):
 Form = FormMeta("Form", (FormBase, ), {})
 
 
+# factories
+def form_factory(name, schema, base=FormBase, metaclass=FormMeta, attrs=None, meta=object()):
+    return metaclass.from_schema(name, schema, (base, ), attrs or {}, meta=meta)
+
+
 # TODO:
 class ModelForm(Form):
     def __init__(self, *args, **kwargs):
         self.model = kwargs.pop("model", None)
         super(ModelForm, self).__init__(*args, **kwargs)
+
+
+def field_factory(marshmallow_field, **options):
+    if "required" not in options:
+        options["required"] = True
+    return partial(field, marshmallow_field, **options)
 
 
 def select_wrap(pairs, *args, **kwargs):
