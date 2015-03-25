@@ -88,6 +88,8 @@ class ParentForm(mf.form_factory("_ParentForm", ParentSchema)):
             "description": {"ja": "概要"},
             "comments": {"ja": "コメント"}
         }
+
+
 template = Template("""
 ${form.description['ja']}: ${form.description.value}
 ${form.comments['ja']}:
@@ -99,5 +101,16 @@ ${form.likes['ja'] or form.likes._name}:
  - ${c.id.value}(${c.created_at.value})
 %endfor
 """)
+
+
 form = ParentForm.from_object(parent)
 print(template.render(form=form))
+
+# 概要: long long text
+# コメント:
+#  - 1(2015-03-25T22:20:56.635734+00:00)
+#  - 2(2015-03-25T22:20:56.635734+00:00)
+# likes:
+#  - 1(2015-03-25T22:20:56.635734+00:00)
+#  - 2(2015-03-25T22:20:56.635734+00:00)
+#  - 3(2015-03-25T22:20:56.635734+00:00)
