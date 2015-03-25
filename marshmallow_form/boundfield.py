@@ -34,7 +34,10 @@ class Field(object):
 
 def bound_field(name, field, ob, key=None, overrides=None):
     if hasattr(field, "nested"):
-        return NestedBoundField(name, field, ob, overrides=overrides)
+        if field.many:
+            return NestedListBoundField(name, field, ob, overrides=overrides)
+        else:
+            return NestedBoundField(name, field, ob, key=key, overrides=overrides)
     else:
         return BoundField(name, field, ob, key=key, overrides=overrides)
 
@@ -96,14 +99,18 @@ class SubForm(object):
 
     @classmethod
     def from_form(cls, name, form):
-        data = (form.data.get(name) if form.data else None) or {}
+        if hasattr(form.data, "get"):
+            data = (form.data.get(name) if form.data else None) or {}
+        else:
+            data = form.data[name]
         initial = (form.initial.get(name) if form.initial else None) or {}
         return cls(data, initial, itemgetter=form.itemgetter)
 
 
 class NestedBoundField(BoundField):
-    def __init__(self, name, field, form, overrides=None):
+    def __init__(self, name, field, form, overrides=None, key=None):
         self._name = name
+        self.key = key if key is not None else name
         self.field = field
         self.form = form
         self.overrides = overrides
@@ -120,8 +127,39 @@ class NestedBoundField(BoundField):
     def __getattr__(self, k):
         if k not in self.children:
             raise AttributeError(k)
-        subform = SubForm.from_form(self._name, self.form)
+        subform = SubForm.from_form(self.key, self.form)
         name = "{}.{}".format(self._name, k)
         bf = bound_field(name, self.children[k], subform, key=k, overrides=self.metadata.get(k))
         setattr(self, k, bf)
         return bf
+
+
+class NestedListBoundField(BoundField):
+    def __init__(self, name, field, form, overrides=None):
+        self._name = name
+        self.field = field
+        self.form = form
+        self.overrides = overrides
+
+    @reify
+    def children(self):
+        initial = (self.form.initial.get(self._name) if self.form.initial else None) or {}
+        overrides = (self.overrides.get(self._name) if self.overrides else None) or {}
+        itemgetter = self.form.itemgetter
+        field = self.field
+        data = self.form.data[self._name]
+        return LazyList(NestedBoundField("{}.{}".format(self._name, i), field, SubForm(data, initial, itemgetter=itemgetter), key=i, overrides=overrides)
+                        for i in range(len(data)))
+
+    def __iter__(self):
+        for c in self.children:
+            yield c
+
+    def __getitem__(self, i):
+        if isinstance(i, int):
+            return self.children[i]
+        else:
+            return self.form.itemgetter(self.metadata, i)
+
+    def __getattr__(self, k):
+        raise AttributeError(k)
