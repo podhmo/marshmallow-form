@@ -186,12 +186,16 @@ class FormMeta(type):
         fields = {}
         register_actions = []
         schema_bases = []
+        metadata = {}
+
         for b in bases:
             if hasattr(b, "ordered_names"):
                 for k in b.ordered_names:
                     v = getattr(b, k)
                     schema_attrs[k] = v.expose()
                     fields[k] = v
+            if hasattr(b, "metadata"):
+                metadata.update(b.metadata)
             if hasattr(b, "Schema") and issubclass(b.Schema, self.Schema):
                 if b.Schema not in schema_bases:
                     schema_bases.append(b.Schema)
@@ -209,6 +213,7 @@ class FormMeta(type):
         layout = None
         if "Meta" in attrs:
             layout = getattr(attrs["Meta"], "layout", None)
+            metadata.update(getattr(attrs["Meta"], "metadata", {}))
 
         # this is meta of marshmallow Schema
         class Meta:
@@ -230,6 +235,9 @@ class FormMeta(type):
         if layout is not None:
             layout.check_shape(cls())
         cls.layout = layout or FlattenLayout()
+
+        cls.metadata = metadata
+
         for ac in register_actions:
             ac.register(cls.Schema)
         return cls
@@ -300,13 +308,16 @@ class FormBase(object):
     preprocessor = partial(RegisterAction, (lambda schema, method: schema.preprocessor(method)))
     accessor = partial(RegisterAction, (lambda schema, method: schema.accessor(method)))
 
-    def __init__(self, data=None, initial=None, prefix="", options={"strict": False}):
+    def __init__(self, data=None, initial=None, prefix="", options={"strict": False}, metadata=None):
         self.options = options
         self.rawdata = data or {}
         self.data = self.rawdata.copy()
         self.initial = initial or {}
         self.errors = None
         self.prefix = prefix
+        self.metadata = copy.deepcopy(self.metadata)
+        if metadata:
+            self.metadata.update(metadata)
 
     @reify
     def schema(self):
@@ -390,6 +401,9 @@ class FormBase(object):
         if result.errors:
             raise MarshallingError(result.errors)
         return result.data
+
+    def __getitem__(self, k):
+        return self.metadata[k]
 
 Form = FormMeta("Form", (FormBase, ), {})
 

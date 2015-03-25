@@ -182,7 +182,7 @@ class InheritanceTests(unittest.TestCase):
         expected = ["name", "age", "ctime.year", "ctime.month", "ctime.day", "utime.year", "utime.month", "utime.day"]
         self.assertEqual(result, expected)
 
-    def test_validation(self):
+    def test_validator(self):
         Class = self._getTarget()
         marker = object()
         r = []
@@ -198,6 +198,32 @@ class InheritanceTests(unittest.TestCase):
         form = Inherited()
         form.deserialize({})
         self.assertEqual(r, [marker])
+
+    def test_metadata(self):
+        Class = self._getTarget()
+
+        class Base(Class):
+            class Meta:
+                metadata = {"description": "this is base"}
+
+        class HasName(Class):
+            class Meta:
+                metadata = {"doc": "doc is important"}
+
+        class Form(Base, HasName):
+            class Meta:
+                metadata = {"name": "form"}
+
+        form = Form()
+        self.assertEqual(form["doc"], "doc is important")
+        self.assertEqual(form["description"], "this is base")
+        self.assertEqual(form["name"], "form")
+        form.metadata["info"] = "help me"
+        self.assertEqual(form["info"], "help me")
+
+        another = Form()
+        with self.assertRaises(KeyError):
+            another["info"]
 
 
 @test_target("marshmallow_form:Form")

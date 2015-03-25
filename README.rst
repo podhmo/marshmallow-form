@@ -9,14 +9,14 @@ form library is not validation library
 
 What is form library?
 
-- anyone says, 'this is validation library for post/get data'
-- another says, 'this is rendering library for form element'
+- anyone says, 'it is validation library for post/get data'
+- another says, 'it is rendering library for form element'
 
 marshmallow-form is not above one.
 form library is 'a container for presentation metadata'. so, form object is just a container.
 
-- 'rendering form element', this is a task of template library(mako, jinja2, ...etc).
-- 'validation post/get data', this is a task of schema library(include. marshmallow).
+- 'rendering form element', it is a task of template library(mako, jinja2, ...).
+- 'validation post/get data', it is a task of schema library(colander, marshmallow, ...).
 
 marshmallow-form is just a metadata container.
 
