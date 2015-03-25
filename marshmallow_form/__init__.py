@@ -46,11 +46,16 @@ class FormMeta(type):
             else:
                 attrs["itemgetter"] = staticmethod(meta.itemgetter)
 
-        fields = []
+        boundary_container = []
         for k, f in schema._declared_fields.items():
             attrs[k] = Field(f, name=k)
-            fields.append(attrs[k])
-        attrs["ordered_names"] = [f.name for f in sorted(fields, key=lambda f: f._c)]
+            boundary_container.append(attrs[k])
+        for field_name in getattr(meta, "fields", []):
+            if field_name not in attrs:
+                attrs[field_name] = Field(None, name=field_name)
+                boundary_container.append(attrs[field_name])
+
+        attrs["ordered_names"] = [f.name for f in sorted(boundary_container, key=lambda f: f._c)]
 
         cls = super(FormMeta, self).__new__(self, name, bases, attrs)
 
@@ -68,7 +73,7 @@ class FormMeta(type):
         # - layout
 
         schema_attrs = {}
-        fields = {}
+        boundary_container = {}
         register_actions = []
         schema_bases = []
         metadata = {}
@@ -78,7 +83,7 @@ class FormMeta(type):
                 for k in b.ordered_names:
                     v = getattr(b, k)
                     schema_attrs[k] = v.expose()
-                    fields[k] = v
+                    boundary_container[k] = v
             if hasattr(b, "metadata"):
                 metadata.update(b.metadata)
             if hasattr(b, "Schema") and issubclass(b.Schema, self.Schema):
@@ -91,9 +96,14 @@ class FormMeta(type):
             if hasattr(v, "expose"):
                 v.name = k
                 schema_attrs[k] = v.expose()
-                fields[k] = v
+                boundary_container[k] = v
             if hasattr(v, "register") and callable(v.register):
                 register_actions.append(v)
+
+        # this is meta of marshmallow Schema
+        class Meta:
+            ordered = True
+        schema_attrs["Meta"] = Meta
 
         layout = None
         if "Meta" in attrs:
@@ -106,16 +116,18 @@ class FormMeta(type):
                     attrs["itemgetter"] = meta.itemgetter
                 else:
                     attrs["itemgetter"] = staticmethod(meta.itemgetter)
-
-        # this is meta of marshmallow Schema
-        class Meta:
-            ordered = True
-        schema_attrs["Meta"] = Meta
+            if hasattr(meta, "fields"):
+                for field_name in meta.fields:
+                    if field_name not in attrs:
+                        v = Field(None, name=field_name)
+                        attrs[field_name] = v
+                        boundary_container[field_name] = v
+                Meta.fields = attrs["Meta"].fields
 
         if "make_object" in attrs:
             schema_attrs["make_object"] = attrs.pop("make_object")
 
-        attrs["ordered_names"] = [f.name for f in sorted(fields.values(), key=lambda f: f._c)]
+        attrs["ordered_names"] = [f.name for f in sorted(boundary_container.values(), key=lambda f: f._c)]
         attrs["register_actions"] = register_actions
         schema_class = self.SchemaBase.__class__(
             name.replace("Form", "Schema"),
@@ -277,7 +289,7 @@ def nested_wrap(formclass, *args, **kwargs):
 
 if __name__ != "__main__":
     Nested = field_factory(nested_wrap)
-
+    Any = field_factory(fields.Field)
     Price = field_factory(fields.Price)
     Arbitrary = field_factory(fields.Arbitrary)
     Decimal = field_factory(fields.Decimal)
