@@ -117,16 +117,6 @@ class NestedBoundField(BoundField):
             for f in getattr(self, k):
                 yield f
 
-    @reify
-    def metadata(self):
-        if self.overrides:
-            return ChainMap(self.overrides, self.field.metadata)
-        else:
-            return self.field.metadata
-
-    def __getitem__(self, k):
-        return self.form.itemgetter(self.metadata, k)
-
     def __getattr__(self, k):
         if k not in self.children:
             raise AttributeError(k)
