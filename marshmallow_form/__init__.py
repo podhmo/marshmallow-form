@@ -168,6 +168,10 @@ class FormBase(object):
         if metadata:
             self.metadata.update(metadata)
 
+    @property
+    def _update_fields_option(self):
+        return len(self.schema.fields) != len(self.schema.declared_fields)
+
     @reify
     def schema(self):
         return self.Schema(**self.options)
@@ -199,7 +203,7 @@ class FormBase(object):
 
     def _parsing_iterator(self, name, field):
         if hasattr(field, "nested"):
-            for subname, f in field.nested._declared_fields.items():
+            for subname, f in field.schema.fields.items():
                 for subname, subf in self._parsing_iterator(subname, f):
                     yield "{}.{}".format(name, subname), subf
         else:
@@ -243,7 +247,8 @@ class FormBase(object):
 
     def dump(self, data=None):
         data = data or self.data
-        return self.schema.dump(data)
+        result = self.schema.dump(data, update_fields=self._update_fields_option)
+        return result
 
     def serialize(self, data=None):
         result = self.dump(data=data)
