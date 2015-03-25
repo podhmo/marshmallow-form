@@ -10,10 +10,6 @@ class PersonForm(mf.Form):
     name = mf.String()
     birth = mf.Date()
 
-    @mf.Form.accessor
-    def access(self, k, ob):
-        return getattr(ob, k)
-
 people = [
     Person(name="foo", birth=date(2000, 1, 1)),
     Person(name="bar", birth=date(2000, 1, 2)),

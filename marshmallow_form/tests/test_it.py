@@ -106,10 +106,6 @@ class FromObjectTests(unittest.TestCase):
             name = mf.String()
             birth = mf.Date()
 
-            @Class.accessor
-            def access(self, k, ob):
-                return getattr(ob, k)
-
         form = Form.from_object(Person(name="foo", birth=date(2000, 1, 1)))
         self.assertEqual(form.birth.value, "2000-01-01")
 

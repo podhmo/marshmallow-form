@@ -186,6 +186,10 @@ class FormMeta(type):
     from marshmallow import Schema
     SchemaBase = Schema
 
+    @staticmethod
+    def access(self, k, ob):
+        return getattr(ob, k)
+
     def __new__(self, name, bases, attrs):
         # todo: rewrite
         # - collecting schema
@@ -246,7 +250,9 @@ class FormMeta(type):
             name.replace("Form", "Schema"),
             tuple(schema_bases),
             schema_attrs)
+        # schema_class.accessor(self.access)
         attrs["Schema"] = schema_class
+
         cls = super().__new__(self, name, bases, attrs)
 
         if layout is not None:
