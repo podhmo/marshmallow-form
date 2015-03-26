@@ -60,6 +60,10 @@ class BoundField(object):
         else:
             return self.field.metadata
 
+    @property
+    def errors(self):
+        return self.form.errors
+
     def __call__(self):
         if "__call__" in self.metadata:
             return self.metadata["__call__"](self)
@@ -88,12 +92,15 @@ class BoundField(object):
     def value(self):
         return (self.form.data.get(self.key)
                 or self.form.initial.get(self.key)
+                or self.form.rawdata.get(self.key)
                 or self.field.default)
 
 
 class SubForm(object):
-    def __init__(self, data, initial, itemgetter):
+    def __init__(self, data, rawdata, errors, initial, itemgetter):
         self.data = data
+        self.rawdata = rawdata
+        self.errors = errors
         self.initial = initial
         self.itemgetter = itemgetter
 
@@ -101,10 +108,13 @@ class SubForm(object):
     def from_form(cls, name, form):
         if hasattr(form.data, "get"):
             data = (form.data.get(name) if form.data else None) or {}
+            rawdata = (form.rawdata.get(name) if form.rawdata else None) or {}
         else:
             data = form.data[name]
+            rawdata = form.rawdata[name]
         initial = (form.initial.get(name) if form.initial else None) or {}
-        return cls(data, initial, itemgetter=form.itemgetter)
+        errors = (form.errors.get(name) if form.errors else None) or {}
+        return cls(data, rawdata, errors, initial, itemgetter=form.itemgetter)
 
 
 class NestedBoundField(BoundField):
@@ -144,11 +154,13 @@ class NestedListBoundField(BoundField):
     @reify
     def children(self):
         initial = (self.form.initial.get(self._name) if self.form.initial else None) or {}
+        rawdata = (self.form.rawdata.get(self._name) if self.form.rawdata else None) or {}
+        errors = (self.form.errors.get(self._name) if self.form.errors else None) or {}
         overrides = (self.overrides.get(self._name) if self.overrides else None) or {}
         itemgetter = self.form.itemgetter
         field = self.field
         data = self.form.data[self._name]
-        return LazyList(NestedBoundField("{}.{}".format(self._name, i), field, SubForm(data, initial, itemgetter=itemgetter), key=i, overrides=overrides)
+        return LazyList(NestedBoundField("{}.{}".format(self._name, i), field, SubForm(data, rawdata, errors, initial, itemgetter=itemgetter), key=i, overrides=overrides)
                         for i in range(len(data)))
 
     def __iter__(self):

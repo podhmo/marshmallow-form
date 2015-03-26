@@ -168,7 +168,7 @@ class FormBase(object):
         if metadata:
             self.metadata.update(metadata)
 
-    @property
+    @reify
     def _update_fields_option(self):
         return len(self.schema.fields) != len(self.schema.declared_fields)
 
@@ -210,7 +210,7 @@ class FormBase(object):
             yield name, field
 
     def cleansing(self, data=None):
-        data = data or self.data
+        data = data or self.rawdata
         result = d = {}
         for name, f in self.schema.fields.items():
             for k, f in self._parsing_iterator(name, f):
@@ -234,9 +234,10 @@ class FormBase(object):
         return not self.has_errors()
 
     def load(self, data=None, cleansing=True):
-        data = data or self.data
+        data = data or self.rawdata
         if cleansing:
             data = self.cleansing(data)
+            self.rawdata = data  # xxx
         return self.schema.load(data)
 
     def deserialize(self, data=None, cleansing=True):
