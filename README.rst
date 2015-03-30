@@ -39,7 +39,7 @@ from pypi package repository.
 
 ::
 
-   # pip install marshmallow-form  # sorry, haven't upploaded yet.
+   # pip install marshmallow-form
 
 from repository
 
