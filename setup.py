@@ -31,17 +31,17 @@ testing_extras = tests_require + [
 ]
 
 setup(name='marshmallow-form',
-      version='0.0',
-      description='-',
+      version='0.1',
+      description='a wrapper of marshmallow for form library like behavior',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
           "Programming Language :: Python",
           "Programming Language :: Python :: Implementation :: CPython",
       ],
-      keywords='',
-      author="",
+      keywords='marshmallow, form',
+      author="podhmo",
       author_email="",
-      url="",
+      url="https://github.com/podhmo/marshmallow-form",
       packages=find_packages(),
       include_package_data=True,
       zip_safe=False,
