@@ -306,8 +306,9 @@ schema class
 
 .. code-block:: python
 
-  PersonForm.Schema  # => <class 'marshmallow.schema.PersonSchema'>
   from collections import namedtuple
+  Person = namedtuple("Person", "name age")
+
 
   class PersonForm(mf.Form):
       name = mf.Str()
@@ -316,8 +317,8 @@ schema class
       def make_object(self, data):
           return Person(**data)
 
+  PersonForm.Schema  # => <class 'marshmallow.schema.PersonSchema'>
 
-  Person = namedtuple("Person", "name age")
   schema = PersonForm.Schema(many=True)
   schema.dump([Person("foo", 20), Person("bar", 20)]).data
   # => OrderedDict([('name', 'foo'), ('age', 20)]), OrderedDict([('name', 'bar'), ('age', 20)])
