@@ -188,6 +188,9 @@ class FormBase(object):
         if hasattr(field, "expose"):
             field = field.expose()
         self.schema.fields[name] = field
+        if "ordered_names" not in self.__dict__:
+            self.ordered_names = self.ordered_names[:]
+        self.ordered_names.append(name)
         setattr(self, name, BoundField(name, field, self))
 
     def remove_field(self, name):

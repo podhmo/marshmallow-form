@@ -64,9 +64,9 @@ class BoundField(object):
     def errors(self):
         return self.form.errors.get(self.key) or []
 
-    def __call__(self):
+    def __call__(self, *args, **kwargs):
         if "__call__" in self.metadata:
-            return self.metadata["__call__"](self)
+            return self.metadata["__call__"](self, *args, **kwargs)
         return self.value
 
     def __getitem__(self, k):
