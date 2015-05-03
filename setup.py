@@ -31,7 +31,7 @@ testing_extras = tests_require + [
 ]
 
 setup(name='marshmallow-form',
-      version='0.1',
+      version='0.1.1',
       description='a wrapper of marshmallow for form library like behavior',
       long_description=README + '\n\n' + CHANGES,
       classifiers=[
