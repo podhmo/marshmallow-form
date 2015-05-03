@@ -51,9 +51,10 @@ class Issued13Tests(unittest.TestCase):
         form = self._makeForm(input_data)
         self.assertFalse(form.validate())
         expected = [[],
-                    [],
+                    ['Missing data for required field.'],
                     ['Missing data for required field.'],
                     ['Missing data for required field.'],
                     ['Missing data for required field.'],
                     ['Missing data for required field.']]
-        self.assertEqual(list(f.errors for f in form), expected)
+        self.assertEqual(list(f.fullerrors for f in form), expected)
+

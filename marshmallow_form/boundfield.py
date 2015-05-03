@@ -33,23 +33,25 @@ class Field(object):
         return bf
 
 
-def bound_field(name, field, ob, key=None, overrides=None):
+def bound_field(name, field, ob, key=None, overrides=None, parent_errors=None):
+    parent_errors = parent_errors or set()
     if hasattr(field, "nested"):
         if field.many:
-            return NestedListBoundField(name, field, ob, overrides=overrides)
+            return NestedListBoundField(name, field, ob, overrides=overrides, parent_errors=parent_errors)
         else:
-            return NestedBoundField(name, field, ob, key=key, overrides=overrides)
+            return NestedBoundField(name, field, ob, key=key, overrides=overrides, parent_errors=parent_errors)
     else:
-        return BoundField(name, field, ob, key=key, overrides=overrides)
+        return BoundField(name, field, ob, key=key, overrides=overrides, parent_errors=parent_errors)
 
 
 class BoundField(object):
-    def __init__(self, name, field, form, key=None, overrides=None):
+    def __init__(self, name, field, form, key=None, overrides=None, parent_errors=None):
         self.name = name
         self.key = key or name
         self.field = field
         self.form = form
         self.overrides = overrides
+        self.parent_errors = parent_errors
 
     def __iter__(self):
         yield self
@@ -63,7 +65,11 @@ class BoundField(object):
 
     @property
     def errors(self):
-        return self.form.errors.get(self.key) or []
+        return (self.form.errors.get(self.key) or [])
+
+    @property
+    def fullerrors(self):
+        return self.errors + list(self.parent_errors or [])
 
     def __call__(self, *args, **kwargs):
         if "__call__" in self.metadata:
@@ -114,11 +120,8 @@ class SubForm(object):
             data = form.data[name]
             rawdata = form.rawdata[name]
 
-        # parent form's errors are list. like [error, error, error]
-        if not hasattr(form.errors, "get"):
-            errors = {MARKER: form.errors}
-        else:
-            errors = (form.errors.get(name) if form.errors else None) or {}
+        # errors are occured in parent form, errors dict is already flatten. so.
+        errors = (form.errors.get(name) if hasattr(form.errors, "get") else None) or {}
 
         initial = (form.initial.get(name) if form.initial else None) or {}
         return cls(data, rawdata, errors, initial, itemgetter=form.itemgetter)
@@ -127,12 +130,13 @@ class SubForm(object):
 class NestedBoundField(BoundField):
     allkey = "_schema"
 
-    def __init__(self, name, field, form, overrides=None, key=None):
+    def __init__(self, name, field, form, overrides=None, key=None, parent_errors=None):
         self._name = name
         self.key = key if key is not None else name
         self.field = field
         self.form = form
         self.overrides = overrides
+        self.parent_errors = parent_errors
 
     @reify
     def children(self):
@@ -153,21 +157,31 @@ class NestedBoundField(BoundField):
         subform = SubForm.from_form(self.key, self.form)
         name = "{}.{}".format(self._name, k)
 
-        # errors are occured in parent form, errors dict is already flatten. so.
-        if MARKER in subform.errors:
-            subform.errors[k] = subform.errors.pop(MARKER)
+        # propagating parent form's errors. using via self.fullerrors
+        parent_errors = self.parent_errors
+        if self.form.errors is not None:
+            if self.key in self.form.errors:
+                current_errors = self.form.errors[self.key]
+                if not hasattr(current_errors, "get"):
+                    parent_errors.update(current_errors)
 
-        bf = bound_field(name, self.children[k], subform, key=k, overrides=self.metadata.get(k))
+            # errors are occured in parent form, errors dict is already flatten. so.
+            if not hasattr(self.form.errors, "get"):
+                parent_errors.update(self.form.errors)
+
+        bf = bound_field(name, self.children[k], subform, key=k,
+                         overrides=self.metadata.get(k), parent_errors=parent_errors)
         setattr(self, k, bf)
         return bf
 
 
 class NestedListBoundField(BoundField):
-    def __init__(self, name, field, form, overrides=None):
+    def __init__(self, name, field, form, overrides=None, parent_errors=None):
         self._name = name
         self.field = field
         self.form = form
         self.overrides = overrides
+        self.parent_errors = parent_errors
 
     @reify
     def children(self):
