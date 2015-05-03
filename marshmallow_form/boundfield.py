@@ -11,6 +11,7 @@ def field(fieldclass, *args, **kwargs):
 
 
 C = Counter(0)
+MARKER = object()  # adhoc
 
 
 class Field(object):
@@ -73,7 +74,7 @@ class BoundField(object):
         return self.form.itemgetter(self.metadata, k)
 
     def __getattr__(self, k):
-        return getattr(self.field, k)
+        return getattr(self.field, k, None) or []
 
     def disabled(self):
         self.metadata["disabled"] = True
@@ -105,15 +106,21 @@ class SubForm(object):
         self.itemgetter = itemgetter
 
     @classmethod
-    def from_form(cls, name, form):
+    def from_form(cls, name, form, used_parent_errors=None):
         if hasattr(form.data, "get"):
             data = (form.data.get(name) if form.data else None) or {}
             rawdata = (form.rawdata.get(name) if form.rawdata else None) or {}
         else:
             data = form.data[name]
             rawdata = form.rawdata[name]
+
+        # parent form's errors are list. like [error, error, error]
+        if not hasattr(form.errors, "get"):
+            errors = {MARKER: form.errors}
+        else:
+            errors = (form.errors.get(name) if form.errors else None) or {}
+
         initial = (form.initial.get(name) if form.initial else None) or {}
-        errors = (form.errors.get(name) if form.errors else None) or {}
         return cls(data, rawdata, errors, initial, itemgetter=form.itemgetter)
 
 
@@ -145,6 +152,11 @@ class NestedBoundField(BoundField):
             raise AttributeError(k)
         subform = SubForm.from_form(self.key, self.form)
         name = "{}.{}".format(self._name, k)
+
+        # errors are occured in parent form, errors dict is already flatten. so.
+        if MARKER in subform.errors:
+            subform.errors[k] = subform.errors.pop(MARKER)
+
         bf = bound_field(name, self.children[k], subform, key=k, overrides=self.metadata.get(k))
         setattr(self, k, bf)
         return bf
